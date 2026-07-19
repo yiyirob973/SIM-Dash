@@ -58,6 +58,8 @@ The controller expects a stream of comma-separated variables (CSV) over the Seri
 **Example Packet:**
 `1,1,65,4200,90,75,LAP 4 - POS 3,E_TIME 06:14\n`
 
+See example_simhub_javascript.js for what i am currently using
+
 ---
 
 ## 🛠️ Calibration & Tuning
