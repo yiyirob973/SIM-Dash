@@ -34,7 +34,6 @@ Instead of aggressively snapping on and off, the shift light smoothly interpolat
 By overclocking the `Wire` library to 400kHz and using an in-memory string-padding algorithm, character transmission overhead is reduced by over 50%. This guarantees the screen never flickers and never slows down the mechanical needles.
 
 ---
-
 ## 🔌 Hardware Setup
 
 ### Wiring Map
@@ -72,3 +71,16 @@ Because physical gauges differ across makes and models, the code uses a series o
 const int SPEED_POINTS = 8;
 const int speedSteps[] = {0, 16, 40, 80, 100, 120, 140, 180}; // Game telemetry (MPH)
 const int speedHz[]    = {0, 31, 88, 178, 222, 265, 300, 384}; // Gauge requirement (Hz)
+```
+
+**Tuning Needle Weight:**
+Find these variables in the main loop to adjust how heavy the speedometer feels:
+* `SPEED_ACCEL_RATE`: Increase for a lighter, faster-climbing needle.
+* `SPEED_DECEL_RATE`: Decrease to give the needle a heavier, lazier drop.
+
+---
+
+## 💾 Dependencies
+Install these via the Arduino IDE Library Manager:
+* **TimerOne** (by Jesse Tane, et al.)
+* **LiquidCrystal_I2C** (by Frank de Brabander)
