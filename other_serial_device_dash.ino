@@ -18,6 +18,7 @@
 #include <LiquidCrystal_I2C.h> // Drives the 16x2 LCD display
 #include <Wire.h>              // Required for I2C communication
 #include <TimerOne.h>          // Hardware timer for precise frequency generation
+#include <avr/pgmspace.h>      // Required for PROGMEM string handling
 
 // Initialize LCD (Address: 0x27, Columns: 16, Rows: 2)
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -37,8 +38,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 // ------------------------------------------------------------------------------------
 // 3. GLOBAL VARIABLES & STATE TRACKING
 // ------------------------------------------------------------------------------------
-// Serial Parsing Variables
-const byte maxChars = 140;      
+// Serial Parsing Variables (Optimized size to save SRAM)
+const byte maxChars = 100;      
 char receivedChars[maxChars];    
 char tempChars[maxChars];        
 boolean newData = false;         
@@ -214,8 +215,8 @@ bool parseTelemetryData() {
  */
 void triggerFailsafe() {
     for (int i = 0; i < 7; i++) values[i] = 0; 
-    strcpy(lcdLine1, "  SIMHUB READY  ");
-    strcpy(lcdLine2, " WAITING FOR PC ");
+    strcpy_P(lcdLine1, PSTR("  SIMHUB READY  "));
+    strcpy_P(lcdLine2, PSTR(" WAITING FOR PC "));
 }
 
 // ------------------------------------------------------------------------------------
@@ -256,7 +257,7 @@ void setup() {
   Wire.setClock(400000); // Maximize I2C bus speed to prevent loop blocking
   lcd.backlight();
   lcd.setCursor(0,0);
-  lcd.print("System Loading..");
+  lcd.print(F("System Loading.."));
 }
 
 // ------------------------------------------------------------------------------------
@@ -318,14 +319,18 @@ void loop() {
     if (targetTempPWM > 0) analogWrite(TEMP_PIN, targetTempPWM); else analogWrite(TEMP_PIN, 0); 
     if (targetBoostPWM > 0) analogWrite(BOOST_PIN, targetBoostPWM); else analogWrite(BOOST_PIN, 0); 
     
-    // -- FREQUENCY DELIVERY TO ISR --
-    // Briefly pause interrupts to safely pass new frequency targets to the ISR
+    // -- FREQUENCY DELIVERY TO ISR (OPTIMIZED NON-BLOCKING MATH) --
+    // Perform division math outside the critical section to prevent missing 50µs interrupts
+    unsigned int newTachTicks = (targetTachHz > 15) ? (10000 / targetTachHz) : 0;
+    unsigned int newSpeedoTicks = (currentSpeedHz > 15) ? (10000 / currentSpeedHz) : 0;
+
+    // Briefly pause interrupts only for safe register/variable assignments
     noInterrupts(); 
-    if (targetTachHz > 15) { tachPeriodTicks = 10000 / targetTachHz; } 
-    else { tachPeriodTicks = 0; tachState = false; digitalWrite(TACH_PIN, LOW); }
+    tachPeriodTicks = newTachTicks;
+    if (newTachTicks == 0) { tachState = false; digitalWrite(TACH_PIN, LOW); }
     
-    if (currentSpeedHz > 15) { speedoPeriodTicks = 10000 / currentSpeedHz; } 
-    else { speedoPeriodTicks = 0; speedoState = false; digitalWrite(SPEEDO_PIN, LOW); }
+    speedoPeriodTicks = newSpeedoTicks;
+    if (newSpeedoTicks == 0) { speedoState = false; digitalWrite(SPEEDO_PIN, LOW); }
     interrupts(); 
 
     // -- WARNING LIGHTS LOGIC --
