@@ -1,6 +1,8 @@
 # 🏎️ Sim Racing Gauge Cluster Controller
 Written mostly by AI. I could not find code online to help power what I needed so posting here so others can possibly find it. This is a simple method for anybody with an Arduino nano to power way more than what SimHub nativily supports. The rest of this Readme was writting by AI to describe the functionality and how to implement it.
 
+Use the tool here https://studio.cauch.uk/dash or the included HTML file to configure the needed Simhub JS
+
 A high-performance, ultra-stable hardware controller designed to bridge PC-based sim racing telemetry (like SimHub) to physical automotive dashboard gauges. Running on an 8-bit Arduino Nano, this firmware uses a 120Hz processing loop and hardware-level interrupt timers to generate clean, jitter-free signals without dropping frames.
 
 ---
