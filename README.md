@@ -1,7 +1,7 @@
 # 🏎️ Sim Racing Gauge Cluster Controller
 Written mostly by AI. I could not find code online to help power what I needed so posting here so others can possibly find it. This is a simple method for anybody with an Arduino nano to power way more than what SimHub nativily supports. The rest of this Readme was writting by AI to describe the functionality and how to implement it.
 
-Use the tool here https://studio.cauch.uk/dash or the included HTML file to configure the needed Simhub JS
+Use the tool here https://studio.cauch.uk/dash or the included HTML file to configure the needed Simhub JS.
 
 A high-performance, ultra-stable hardware controller designed to bridge PC-based sim racing telemetry (like SimHub) to physical automotive dashboard gauges. Running on an 8-bit Arduino Nano, this firmware uses a 120Hz processing loop and hardware-level interrupt timers to generate clean, jitter-free signals without dropping frames.
 
@@ -33,6 +33,12 @@ Instead of aggressively snapping on and off, the shift light smoothly interpolat
 
 By overclocking the `Wire` library to 400kHz and using an in-memory string-padding algorithm, character transmission overhead is reduced by over 50%. This guarantees the screen never flickers and never slows down the mechanical needles.
 
+### 5. Linear PWM Boost Pressure Gauge
+![Boost Animation](assets/boost.gif)
+> *Real-time pressure tracking via dedicated hardware PWM response.*
+
+The integrated boost pressure circuit maps manifold pressure telemetry straight to an independent analog hardware pin, letting you track forced induction seamlessly alongside standard engine vitals.
+
 ---
 ## 🔌 Hardware Setup
 
@@ -44,6 +50,7 @@ By overclocking the `Wire` library to 400kHz and using an in-memory string-paddi
 | **Check Engine LED** | `D4` | Digital | ON/OFF state |
 | **Coolant Temp** | `D5` | PWM (8-bit) | Variable voltage |
 | **Fuel Level** | `D6` | PWM (8-bit) | Variable voltage |
+| **Boost Pressure** | `D9` | PWM (8-bit) | Variable voltage |
 | **Speedometer** | `D11` | Frequency | Background Timer1 Interrupt |
 | **LCD (SDA)**| `A4` | I2C Data | Telemetry Display |
 | **LCD (SCL)**| `A5` | I2C Clock | Overclocked to 400kHz |
@@ -52,15 +59,15 @@ By overclocking the `Wire` library to 400kHz and using an in-memory string-paddi
 
 ## 📡 PC Telemetry Setup (SimHub)
 
-The controller expects a stream of comma-separated variables (CSV) over the Serial port at **115200 Baud**, terminated by a newline (`\n`). 
+The controller expects an order-independent, semicolon-delimited key-value stream over the Serial port at **115200 Baud**, terminated by a newline (`\n`). This modular token approach protects your gauges from dropping frames or misinterpreting data if transmission packets are missing mid-stream.
 
 **Format:**
-`ShiftLight,EngineLight,Speed,RPM,Temp,Fuel,LCD_Line1,LCD_Line2\n`
+`S=[Shift];E=[Engine];V=[Speed];R=[RPM];T=[Temp];F=[Fuel];B=[Boost];L1=[Line1];L2=[Line2];\n`
 
 **Example Packet:**
-`1,1,65,4200,90,75,LAP 4 - POS 3,E_TIME 06:14\n`
+`S=1;E=1;V=65;R=4200;T=90;F=75;B=14;L1=LAP 4 - POS 3;L2=E_TIME 06:14;\n`
 
-See example_simhub_javascript.js for what i am currently using
+See `example_simhub_javascript.js` for the exact configuration logic matching this architecture.
 
 ---
 
@@ -73,16 +80,3 @@ Because physical gauges differ across makes and models, the code uses a series o
 const int SPEED_POINTS = 8;
 const int speedSteps[] = {0, 16, 40, 80, 100, 120, 140, 180}; // Game telemetry (MPH)
 const int speedHz[]    = {0, 31, 88, 178, 222, 265, 300, 384}; // Gauge requirement (Hz)
-```
-
-**Tuning Needle Weight:**
-Find these variables in the main loop to adjust how heavy the speedometer feels:
-* `SPEED_ACCEL_RATE`: Increase for a lighter, faster-climbing needle.
-* `SPEED_DECEL_RATE`: Decrease to give the needle a heavier, lazier drop.
-
----
-
-## 💾 Dependencies
-Install these via the Arduino IDE Library Manager:
-* **TimerOne** (by Jesse Tane, et al.)
-* **LiquidCrystal_I2C** (by Frank de Brabander)

@@ -310,7 +310,7 @@ let isGameRunning = $prop('DataCorePlugin.GameRunning');
 let standby = String(new Date().getHours()).padStart(2, '0') + ":" + String(new Date().getMinutes()).padStart(2, '0');
 let lcd1 = "     " + standby; 
 let lcd2 = "                "; // 16 spaces
-let shiftLight = 0, engineLight = 1, speed = 0, tach = 0, temp = 0, fuel = 0;
+let shiftLight = 0, engineLight = 1, speed = 0, tach = 0, temp = 0, fuel = 0, boost = 0;
 
 // 3. Populate live telemetry
 if (isGameRunning) {
@@ -321,6 +321,10 @@ if (isGameRunning) {
     tach = Math.round($prop('Rpms') || 0);
     temp = Math.round($prop('WaterTemperature') || 0);
     fuel = Math.round($prop('DataCorePlugin.Computed.Fuel_Percent') || 0);
+    
+    // Safely capture boost metrics (fallback to 0 if atmospheric/not-applicable)
+    boost = Math.round($prop('TurboBoost')) || Math.round($prop('Boost')) || 0;
+    if (boost < 0) boost = 0; 
     
     // Shift Lights
     if ($prop('CarSettings_RPMShiftLight2') == 1) { shiftLight = 2; } 
@@ -333,12 +337,23 @@ ${generateSimhubCode(l1, 'lcd1')}
 ${generateSimhubCode(l2, 'lcd2')}
 }
 
-// 4. Protection pass (strips rogue commas to protect Arduino parsing)
-lcd1 = String(lcd1).replace(/,/g, '').substring(0,16).padEnd(16, ' ');
-lcd2 = String(lcd2).replace(/,/g, '').substring(0,16).padEnd(16, ' ');
+// 4. Protection pass (strips rogue semicolons to protect Arduino token parsing)
+lcd1 = String(lcd1).replace(/;/g, '').substring(0,16).padEnd(16, ' ');
+lcd2 = String(lcd2).replace(/;/g, '').substring(0,16).padEnd(16, ' ');
 
-// Output Serial string
-return shiftLight + "," + engineLight + "," + speed + "," + tach + "," + temp + "," + fuel + "," + lcd1 + "," + lcd2 + "\\n";`;
+// 5. Construct modular semicolon-delimited key-value string
+let output = "";
+output += "S=" + shiftLight + ";";
+output += "E=" + engineLight + ";";
+output += "V=" + speed + ";";
+output += "R=" + tach + ";";
+output += "T=" + temp + ";";
+output += "F=" + fuel + ";";
+output += "B=" + boost + ";";
+output += "L1=" + lcd1 + ";";
+output += "L2=" + lcd2 + ";";
+
+return output + "\\n";`;
 
             document.getElementById('code-output').value = simHubCode;
         }
