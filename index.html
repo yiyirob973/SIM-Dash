@@ -36,7 +36,7 @@
             flex-direction: column;
             gap: 25px;
             width: 100%;
-            max-width: 800px;
+            max-width: 1000px;
         }
 
         /* Hardware LCD Styling */
@@ -154,10 +154,48 @@
             font-size: 13px;
         }
 
+        /* Simulator styles */
+        .simulator {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 12px;
+            align-items: start;
+        }
+        .sim-box {
+            background: #0f0f0f;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            color: #d8ffd8;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .sim-preview {
+            background: #071; /* darker green */
+            color: #081; 
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-shadow: none;
+            white-space: pre;
+            width: 16ch;
+            height: 3.2em;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .kv-list { max-height: 200px; overflow: auto; }
+        .kv { display:flex; justify-content:space-between; border-bottom:1px dashed #223322; padding:6px 0; }
+
         /* Mobile specific tweaks */
-        @media (max-width: 500px) {
+        @media (max-width: 900px) {
+            .simulator { grid-template-columns: 1fr; }
             .line-grid { grid-template-columns: 1fr 1fr; }
             .lcd-screen { padding: 10px; }
+            textarea { height: 240px; }
         }
     </style>
 </head>
@@ -201,10 +239,49 @@
             </div>
             <textarea id="code-output" readonly spellcheck="false"></textarea>
         </div>
+
+        <!-- Simulator -->
+        <div class="controls-card">
+            <h3>Preview Simulator</h3>
+            <p style="color:#aaa; margin-top:0;">Edit fake $prop values as JSON, then run the simulator to evaluate the generated script and see parsed output.</p>
+            <div class="simulator">
+                <div>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <button onclick="runSimulator()">Run Simulation</button>
+                        <button onclick="resetFakeProps()">Reset Props</button>
+                        <button onclick="randomizeFakeProps()">Randomize</button>
+                    </div>
+                    <textarea id="fake-props" class="sim-box" spellcheck="false"></textarea>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div class="sim-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <strong>Raw Output</strong>
+                            <button onclick="copyRaw()" style="padding:6px 8px; font-size:12px;">Copy</button>
+                        </div>
+                        <pre id="sim-raw" style="white-space:pre-wrap; margin:0;">(run simulator)</pre>
+                    </div>
+
+                    <div class="sim-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <strong>LCD Preview</strong>
+                            <small style="color:#9f9">Parsed lines</small>
+                        </div>
+                        <div class="sim-preview" id="sim-lcd">                \n                </div>
+                    </div>
+
+                    <div class="sim-box" style="overflow:auto;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;\"><strong>Key / Value</strong><small style="color:#9f9">semicolon-delimited</small></div>
+                        <div id="sim-kv" class="kv-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // Expanded Library of Telemetry Items
+        // Expanded Library of Telemetry Items (fixed delta and added boost)
         const lib = {
             empty: { label: "- Empty -", preview: "", code: `""` },
             gearFull: { label: "Gear (GEAR: 4)", preview: "GEAR: 4", code: `("GEAR: " + String($prop('Gear') || 'N'))` },
@@ -220,9 +297,10 @@
             lapCur: { label: "Current Lap Time", preview: "01:22", code: `String($prop('CurrentLapTimeFormatted') || "00:00").substring(0, 5)` },
             lapBest: { label: "Best Lap Time", preview: "B01:20", code: `("B" + String($prop('BestLapTimeFormatted') || "--:--").substring(0, 5))` },
             lapLast: { label: "Last Lap Time", preview: "L01:24", code: `("L" + String($prop('LastLapTimeFormatted') || "--:--").substring(0, 5))` },
-            delta: { label: "Delta (+0.4s)", preview: "+0.4s", code: `((($prop('SessionBestLiveDeltaSeconds') || 0) > 0 ? "+" : "") + String(($prop('SessionBestLiveDeltaSeconds') || 0).toFixed(1)) + "s")` },
+            delta: { label: "Delta (+0.4s)", preview: "+0.4s", code: `((($prop('SessionBestLiveDeltaSeconds') || 0) > 0 ? "+" : "") + String(Math.abs(($prop('SessionBestLiveDeltaSeconds') || 0)).toFixed(1)) + "s")` },
             dist: { label: "Distance to Finish", preview: "14.2k", code: `((($prop('GameRawData.DistanceToFinish') || 0) / 1000).toFixed(1) + "k")` },
-            clock: { label: "System Clock", preview: "14:30", code: `(String(new Date().getHours()).padStart(2, '0') + ":" + String(new Date().getMinutes()).padStart(2, '0'))` }
+            clock: { label: "System Clock", preview: "14:30", code: `(String(new Date().getHours()).padStart(2, '0') + ":" + String(new Date().getMinutes()).padStart(2, '0'))` },
+            boost: { label: "Boost (psi)", preview: "8psi", code: `((Math.max(0, Math.round($prop('TurboBoost') || $prop('Boost') || 0))) + "psi")` }
         };
 
         // Initialize Dropdowns
@@ -243,8 +321,16 @@
             
             document.getElementById('l2_s1').value = 'lapCur';
             document.getElementById('l2_s4').value = 'dist';
-            
+
+            // Prepare default fake props
+            resetFakeProps();
+
             updateUI();
+
+            // Auto-run simulator when code changes or props edited
+            document.getElementById('fake-props').addEventListener('input', () => {
+                debounce(runSimulator, 300)();
+            });
         };
 
         // Layout Engine: Distributes items evenly across 16 characters for HTML Preview
@@ -302,33 +388,42 @@
             // Update HTML LCD Preview
             document.getElementById('lcd-preview').innerHTML = generateHTMLPreview(l1) + "<br>" + generateHTMLPreview(l2);
 
-            // Generate Final SimHub JavaScript Payload
+            // Generate Final SimHub JavaScript Payload (aligned with example_simhub_javascript.js)
             const simHubCode = `// 1. Establish core state
 let isGameRunning = $prop('DataCorePlugin.GameRunning');
 
-// 2. Declare standby clock for main menu
-let standby = String(new Date().getHours()).padStart(2, '0') + ":" + String(new Date().getMinutes()).padStart(2, '0');
-let lcd1 = "     " + standby; 
-let lcd2 = "                "; // 16 spaces
-let shiftLight = 0, engineLight = 1, speed = 0, tach = 0, temp = 0, fuel = 0, boost = 0;
+// 2. Declare default standby states
+let shiftLight = 0;
+let engineLight = 0;
+let speed = 0;
+let tach = 0;
+let temp = 0;
+let fuel = 0;
+let boost = 0; // New data field
+let now = new Date();
+let hours = now.getHours().toString().padStart(2, '0');
+let minutes = now.getMinutes().toString().padStart(2, '0');
+let lcd1 = "     " + hours + ":" + minutes; 
+let lcd2 = "";
 
 // 3. Populate live telemetry
 if (isGameRunning) {
+    engineLight = $prop('EngineIgnitionOn') ? 0 : 1;
+    speed = Math.round($prop('SpeedMph')) || 0;
+    tach = Math.round($prop('Rpms')) || 0;
+    temp = Math.round($prop('WaterTemperature')) || 0;
+    fuel = Math.round($prop('DataCorePlugin.Computed.Fuel_Percent')) || 0;
     
-    // Core Hardware Gauges
-    engineLight = $prop('EngineIgnitionOn') ? 1 : 0;
-    speed = Math.round($prop('SpeedMph') || 0);
-    tach = Math.round($prop('Rpms') || 0);
-    temp = Math.round($prop('WaterTemperature') || 0);
-    fuel = Math.round($prop('DataCorePlugin.Computed.Fuel_Percent') || 0);
-    
-    // Safely capture boost metrics (fallback to 0 if atmospheric/not-applicable)
+    // Safely capture boost metrics (fallback to 0 if N/A or atmospheric)
     boost = Math.round($prop('TurboBoost')) || Math.round($prop('Boost')) || 0;
-    if (boost < 0) boost = 0; 
+    if (boost < 0) boost = 0; // Prevent reverse needle bounce from vacuum pressures
     
-    // Shift Lights
-    if ($prop('CarSettings_RPMShiftLight2') == 1) { shiftLight = 2; } 
-    else if ($prop('CarSettings_RPMShiftLight1') == 1) { shiftLight = 1; }
+    // Shift Light Logic
+    if ($prop('CarSettings_RPMShiftLight2') == 1) {
+        shiftLight = 2;
+    } else if ($prop('CarSettings_RPMShiftLight1') == 1) {
+        shiftLight = 1;
+    }
     
     // --- DYNAMIC LINE 1 CONFIGURATION ---
 ${generateSimhubCode(l1, 'lcd1')}
@@ -337,11 +432,11 @@ ${generateSimhubCode(l1, 'lcd1')}
 ${generateSimhubCode(l2, 'lcd2')}
 }
 
-// 4. Protection pass (strips rogue semicolons to protect Arduino token parsing)
+// 4. Final safety pass (strip out semicolons to preserve token processing boundaries)
 lcd1 = String(lcd1).replace(/;/g, '').substring(0,16).padEnd(16, ' ');
 lcd2 = String(lcd2).replace(/;/g, '').substring(0,16).padEnd(16, ' ');
 
-// 5. Construct modular semicolon-delimited key-value string
+// 5. Construct modular tokenized output
 let output = "";
 output += "S=" + shiftLight + ";";
 output += "E=" + engineLight + ";";
@@ -349,13 +444,16 @@ output += "V=" + speed + ";";
 output += "R=" + tach + ";";
 output += "T=" + temp + ";";
 output += "F=" + fuel + ";";
-output += "B=" + boost + ";";
+output += "B=" + boost + ";"; // Append boost data
 output += "L1=" + lcd1 + ";";
 output += "L2=" + lcd2 + ";";
 
 return output + "\\n";`;
 
             document.getElementById('code-output').value = simHubCode;
+
+            // Update simulator automatically
+            debounce(runSimulator, 100)();
         }
 
         // Copy to clipboard
@@ -369,6 +467,153 @@ return output + "\\n";`;
                 btn.innerText = 'Copy Logic';
                 btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
             }, 2500);
+        }
+
+        // ---------------- Simulator Engine -----------------
+        const defaultFakeProps = {
+            "DataCorePlugin": { "GameRunning": true, "Computed": { "Fuel_Percent": 78 } },
+            "EngineIgnitionOn": true,
+            "SpeedMph": 125,
+            "Rpms": 6400,
+            "WaterTemperature": 90,
+            "TurboBoost": 8,
+            "Boost": 0,
+            "CarSettings_RPMShiftLight1": 0,
+            "CarSettings_RPMShiftLight2": 1,
+            "Gear": 4,
+            "AfterburnerPlugin": { "Framerate_FPS": 120 },
+            "GameRawData": { "DistanceToFinish": 14200 },
+            "CurrentLapTimeFormatted": "01:22",
+            "LastLapTimeFormatted": "01:24",
+            "SessionBestLiveDeltaSeconds": 0.4,
+            "Position": 1
+        };
+
+        function resetFakeProps() {
+            document.getElementById('fake-props').value = JSON.stringify(defaultFakeProps, null, 2);
+            debounce(runSimulator, 50)();
+        }
+
+        function randomizeFakeProps() {
+            const p = JSON.parse(document.getElementById('fake-props').value || '{}');
+            // mutate a few common props
+            p.DataCorePlugin = p.DataCorePlugin || {};
+            p.DataCorePlugin.Computed = p.DataCorePlugin.Computed || {};
+            p.DataCorePlugin.GameRunning = Math.random() > 0.1;
+            p.DataCorePlugin.Computed.Fuel_Percent = Math.floor(Math.random() * 100);
+            p.EngineIgnitionOn = Math.random() > 0.2;
+            p.SpeedMph = Math.floor(Math.random() * 200);
+            p.Rpms = Math.floor(Math.random() * 8000);
+            p.WaterTemperature = 70 + Math.floor(Math.random() * 40);
+            p.TurboBoost = Math.floor(Math.random() * 30) - 2; // some negative values possible
+            p.Boost = Math.floor(Math.random() * 30);
+            p.CarSettings_RPMShiftLight1 = Math.random() > 0.7 ? 1 : 0;
+            p.CarSettings_RPMShiftLight2 = Math.random() > 0.85 ? 1 : 0;
+            p.Gear = Math.ceil(Math.random() * 6);
+            p.AfterburnerPlugin = { Framerate_FPS: 60 + Math.floor(Math.random() * 90) };
+            p.GameRawData = { DistanceToFinish: Math.floor(Math.random() * 20000) };
+            p.CurrentLapTimeFormatted = "01:" + String(Math.floor(Math.random() * 60)).padStart(2, '0');
+            p.LastLapTimeFormatted = "01:" + String(Math.floor(Math.random() * 60)).padStart(2, '0');
+            p.SessionBestLiveDeltaSeconds = (Math.random() * 5 - 2.5).toFixed(1);
+            p.Position = Math.ceil(Math.random() * 20);
+            document.getElementById('fake-props').value = JSON.stringify(p, null, 2);
+            debounce(runSimulator, 50)();
+        }
+
+        function copyRaw() {
+            const t = document.getElementById('sim-raw');
+            const range = document.createRange();
+            range.selectNodeContents(t);
+            const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+            document.execCommand('copy');
+            sel.removeAllRanges();
+        }
+
+        function getFakeProps() {
+            try {
+                return JSON.parse(document.getElementById('fake-props').value || '{}');
+            } catch (e) {
+                return {};
+            }
+        }
+
+        // $prop helper supporting dotted paths
+        function makePropAccessor(fakeProps) {
+            return function (key) {
+                try {
+                    // support dotted and nested keys and underscores
+                    if (!key) return undefined;
+                    const parts = key.split('.');
+                    let cur = fakeProps;
+                    for (let p of parts) {
+                        if (cur === undefined || cur === null) return undefined;
+                        // try property as-is
+                        if (p in cur) { cur = cur[p]; continue; }
+                        // fallback: underscores to nested access (e.g., DataCorePlugin.Computed.Fuel_Percent handled above)
+                        // try raw key
+                        if (p.includes('_')) {
+                            if (p in cur) { cur = cur[p]; continue; }
+                        }
+                        // if not found, return undefined
+                        return undefined;
+                    }
+                    return cur;
+                } catch (ex) { return undefined; }
+            };
+        }
+
+        function runSimulator() {
+            const code = document.getElementById('code-output').value;
+            const fakeProps = getFakeProps();
+            const $prop = makePropAccessor(fakeProps);
+
+            // Execute generated code safely and capture output
+            let raw = '(error)';
+            try {
+                // Build function that has $prop in scope
+                const fn = new Function('$prop', code);
+                const res = fn($prop);
+                raw = String(res);
+            } catch (err) {
+                raw = '(runtime error) ' + err.message;
+            }
+
+            document.getElementById('sim-raw').textContent = raw;
+
+            // Parse semicolon-delimited key-values
+            const kvContainer = document.getElementById('sim-kv');
+            kvContainer.innerHTML = '';
+            const parts = raw.split(';').filter(s => s.trim().length > 0);
+            const map = {};
+            parts.forEach(p => {
+                const [k, ...rest] = p.split('=');
+                const v = rest.join('=');
+                map[k] = v;
+                const row = document.createElement('div'); row.className = 'kv';
+                const key = document.createElement('div'); key.textContent = k; key.style.opacity = '0.9';
+                const val = document.createElement('div'); val.textContent = v; val.style.color = '#9f9';
+                row.appendChild(key); row.appendChild(val);
+                kvContainer.appendChild(row);
+            });
+
+            // Update LCD preview
+            const l1 = map['L1'] || '                ';
+            const l2 = map['L2'] || '                ';
+            const lcdEl = document.getElementById('sim-lcd');
+            // show two lines
+            lcdEl.textContent = l1.substring(0,16) + '\n' + l2.substring(0,16);
+
+            // Also update top hardware preview for visual parity
+            document.getElementById('lcd-preview').innerHTML = (l1.substring(0,16)).replace(/ /g, '&nbsp;') + '<br>' + (l2.substring(0,16)).replace(/ /g, '&nbsp;');
+        }
+
+        // Simple debounce
+        function debounce(fn, delay) {
+            let t;
+            return function(...args) {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(this, args), delay);
+            };
         }
     </script>
 </body>
