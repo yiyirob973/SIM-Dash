@@ -50,7 +50,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 15px;
         }
         
         .screw {
@@ -66,11 +66,45 @@
         .screw.bl { bottom: 10px; left: 10px; transform: rotate(75deg); }
         .screw.br { bottom: 10px; right: 10px; transform: rotate(115deg); }
 
-        .lcd-display {
+        .lcd-header {
             display: flex;
-            flex-direction: column;
-            gap: 15px;
             align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 500px;
+            padding: 0 10px;
+            gap: 15px;
+        }
+
+        .mode-indicator {
+            padding: 4px 8px;
+            background: rgba(74, 246, 38, 0.2);
+            border: 1px solid #4af626;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #4af626;
+        }
+
+        .mode-indicator.fallback {
+            background: rgba(255, 71, 71, 0.2);
+            border-color: #ff4747;
+            color: #ff4747;
+        }
+
+        .data-mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .data-mode-toggle input {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
         }
 
         .lcd-screen {
@@ -94,105 +128,49 @@
             justify-content: center;
         }
 
-        /* Gauge Cluster - Modern Card Design */
+        /* Dashboard Gauge Cluster */
         .gauge-cluster {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 20px;
             width: 100%;
-            max-width: 650px;
+            max-width: 800px;
+            padding: 10px;
         }
 
-        .gauge-card {
-            background: linear-gradient(135deg, #1e1e1e 0%, #252525 100%);
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        .analog-gauge-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
         .gauge-label {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: bold;
             color: #888;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 8px;
         }
 
-        .gauge-bar-container {
-            background: #0a0a0a;
-            height: 6px;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-bottom: 8px;
-            border: 1px solid #222;
+        .analog-gauge {
+            width: 140px;
+            height: 100px;
+            position: relative;
         }
 
-        .gauge-bar-fill {
+        .gauge-svg {
+            width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 3px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
         }
 
         .gauge-value {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             color: #4af626;
             font-family: 'Courier New', monospace;
             text-shadow: 0 0 4px rgba(74, 246, 38, 0.5);
-        }
-
-        .gauge-max {
-            font-size: 9px;
-            color: #666;
-            margin-top: 4px;
-        }
-
-        .data-mode-toggle {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 15px;
-            padding: 10px;
-            background: rgba(255, 71, 71, 0.05);
-            border-radius: 6px;
-            border: 1px solid #444;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            color: #aaa;
-        }
-
-        .checkbox-label input {
-            cursor: pointer;
-            width: 18px;
-            height: 18px;
-        }
-
-        .mode-indicator {
-            margin-left: auto;
-            padding: 4px 8px;
-            background: rgba(74, 246, 38, 0.2);
-            border: 1px solid #4af626;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-            color: #4af626;
-        }
-
-        .mode-indicator.fallback {
-            background: rgba(255, 71, 71, 0.2);
-            border-color: #ff4747;
-            color: #ff4747;
         }
 
         /* Controls Panel */
@@ -269,7 +247,7 @@
         /* Simulator styles */
         .simulator {
             display: grid;
-            grid-template-columns: 1fr 380px;
+            grid-template-columns: 1fr 1fr;
             gap: 12px;
             align-items: start;
         }
@@ -321,48 +299,52 @@
             <div class="screw tl"></div><div class="screw tr"></div>
             <div class="screw bl"></div><div class="screw br"></div>
 
-            <div class="lcd-display">
-                <div class="lcd-screen" id="lcd-preview">                \n                </div>
-                <div class="gauge-cluster">
-                    <div class="gauge-card">
-                        <div class="gauge-label">Speed</div>
-                        <div class="gauge-bar-container"><div class="gauge-bar-fill" id="gauge-speed"></div></div>
-                        <div class="gauge-value" id="value-speed">0 mph</div>
-                        <div class="gauge-max">200 mph</div>
-                    </div>
-                    <div class="gauge-card">
-                        <div class="gauge-label">RPM</div>
-                        <div class="gauge-bar-container"><div class="gauge-bar-fill" id="gauge-rpm"></div></div>
-                        <div class="gauge-value" id="value-rpm">0</div>
-                        <div class="gauge-max">8000</div>
-                    </div>
-                    <div class="gauge-card">
-                        <div class="gauge-label">Fuel</div>
-                        <div class="gauge-bar-container"><div class="gauge-bar-fill" id="gauge-fuel"></div></div>
-                        <div class="gauge-value" id="value-fuel">0%</div>
-                        <div class="gauge-max">100%</div>
-                    </div>
-                    <div class="gauge-card">
-                        <div class="gauge-label">Temp</div>
-                        <div class="gauge-bar-container"><div class="gauge-bar-fill" id="gauge-temp"></div></div>
-                        <div class="gauge-value" id="value-temp">0°C</div>
-                        <div class="gauge-max">120°C</div>
-                    </div>
-                    <div class="gauge-card">
-                        <div class="gauge-label">Boost</div>
-                        <div class="gauge-bar-container"><div class="gauge-bar-fill" id="gauge-boost"></div></div>
-                        <div class="gauge-value" id="value-boost">0 psi</div>
-                        <div class="gauge-max">30 psi</div>
-                    </div>
+            <div class="lcd-header">
+                <div class="data-mode-toggle">
+                    <input type="checkbox" id="useGameData" checked onchange="toggleDataMode()">
+                    <label for="useGameData">Live Data</label>
                 </div>
+                <div class="mode-indicator" id="modeIndicator">LIVE</div>
             </div>
 
-            <div class="data-mode-toggle">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="useGameData" checked onchange="toggleDataMode()">
-                    Use Game Data
-                </label>
-                <div class="mode-indicator" id="modeIndicator">LIVE DATA</div>
+            <div class="lcd-screen" id="lcd-preview">                \n                </div>
+
+            <div class="gauge-cluster" id="gauge-cluster">
+                <div class="analog-gauge-container">
+                    <div class="gauge-label">Speed</div>
+                    <div class="analog-gauge">
+                        <svg class="gauge-svg" viewBox="0 0 140 100" id="gauge-speed-svg"></svg>
+                    </div>
+                    <div class="gauge-value" id="value-speed">0 mph</div>
+                </div>
+                <div class="analog-gauge-container">
+                    <div class="gauge-label">RPM</div>
+                    <div class="analog-gauge">
+                        <svg class="gauge-svg" viewBox="0 0 140 100" id="gauge-rpm-svg"></svg>
+                    </div>
+                    <div class="gauge-value" id="value-rpm">0</div>
+                </div>
+                <div class="analog-gauge-container">
+                    <div class="gauge-label">Fuel</div>
+                    <div class="analog-gauge">
+                        <svg class="gauge-svg" viewBox="0 0 140 100" id="gauge-fuel-svg"></svg>
+                    </div>
+                    <div class="gauge-value" id="value-fuel">0%</div>
+                </div>
+                <div class="analog-gauge-container">
+                    <div class="gauge-label">Temp</div>
+                    <div class="analog-gauge">
+                        <svg class="gauge-svg" viewBox="0 0 140 100" id="gauge-temp-svg"></svg>
+                    </div>
+                    <div class="gauge-value" id="value-temp">0°C</div>
+                </div>
+                <div class="analog-gauge-container">
+                    <div class="gauge-label">Boost</div>
+                    <div class="analog-gauge">
+                        <svg class="gauge-svg" viewBox="0 0 140 100" id="gauge-boost-svg"></svg>
+                    </div>
+                    <div class="gauge-value" id="value-boost">0 psi</div>
+                </div>
             </div>
         </div>
 
@@ -423,11 +405,6 @@
                         </div>
                         <div class="sim-preview" id="sim-lcd">                \n                </div>
                     </div>
-
-                    <div class="sim-box" style="overflow:auto;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong>Key / Value</strong><small style="color:#9f9">semicolon-delimited</small></div>
-                        <div id="sim-kv" class="kv-list"></div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -486,14 +463,87 @@
         function toggleDataMode() {
             useGameData = document.getElementById('useGameData').checked;
             const indicator = document.getElementById('modeIndicator');
+            indicator.textContent = useGameData ? 'LIVE' : 'FALLBACK';
             if (useGameData) {
-                indicator.textContent = 'LIVE DATA';
                 indicator.classList.remove('fallback');
             } else {
-                indicator.textContent = 'FALLBACK';
                 indicator.classList.add('fallback');
             }
             runSimulator();
+        }
+
+        function drawGauge(svgId, percentage, color) {
+            const svg = document.getElementById(svgId);
+            if (!svg) return;
+            
+            svg.innerHTML = '';
+            
+            const cx = 70, cy = 70, radius = 50;
+            
+            // Gauge background (semi-circle)
+            const bgPath = `M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`;
+            const bgPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            bgPathEl.setAttribute('d', bgPath);
+            bgPathEl.setAttribute('stroke', '#333');
+            bgPathEl.setAttribute('stroke-width', '4');
+            bgPathEl.setAttribute('fill', 'none');
+            svg.appendChild(bgPathEl);
+            
+            // Colored arc (0-180 degrees)
+            const angle = (Math.min(1, Math.max(0, percentage)) * 180 * Math.PI) / 180;
+            const endX = cx + radius * Math.cos(angle - Math.PI);
+            const endY = cy + radius * Math.sin(angle - Math.PI);
+            
+            const arcPath = `M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`;
+            const arcPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            arcPathEl.setAttribute('d', arcPath);
+            arcPathEl.setAttribute('stroke', color);
+            arcPathEl.setAttribute('stroke-width', '5');
+            arcPathEl.setAttribute('fill', 'none');
+            arcPathEl.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(arcPathEl);
+            
+            // Needle
+            const needleAngle = (Math.min(1, Math.max(0, percentage)) * 180 * Math.PI) / 180;
+            const needleX = cx + (radius - 10) * Math.cos(needleAngle - Math.PI);
+            const needleY = cy + (radius - 10) * Math.sin(needleAngle - Math.PI);
+            
+            const needleEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            needleEl.setAttribute('x1', cx);
+            needleEl.setAttribute('y1', cy);
+            needleEl.setAttribute('x2', needleX);
+            needleEl.setAttribute('y2', needleY);
+            needleEl.setAttribute('stroke', '#4af626');
+            needleEl.setAttribute('stroke-width', '3');
+            needleEl.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(needleEl);
+            
+            // Center dot
+            const dotEl = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dotEl.setAttribute('cx', cx);
+            dotEl.setAttribute('cy', cy);
+            dotEl.setAttribute('r', '4');
+            dotEl.setAttribute('fill', '#4af626');
+            svg.appendChild(dotEl);
+            
+            // Min/Max labels
+            const minText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            minText.setAttribute('x', cx - radius + 8);
+            minText.setAttribute('y', cy + 8);
+            minText.setAttribute('font-size', '10');
+            minText.setAttribute('fill', '#666');
+            minText.setAttribute('text-anchor', 'middle');
+            minText.textContent = '0';
+            svg.appendChild(minText);
+            
+            const maxText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            maxText.setAttribute('x', cx + radius - 8);
+            maxText.setAttribute('y', cy + 8);
+            maxText.setAttribute('font-size', '10');
+            maxText.setAttribute('fill', '#666');
+            maxText.setAttribute('text-anchor', 'middle');
+            maxText.textContent = '100';
+            svg.appendChild(maxText);
         }
 
         function updateGauges(fakeProps) {
@@ -503,20 +553,20 @@
             const temp = Math.round(fakeProps.WaterTemperature || 0);
             const boost = Math.max(0, Math.round(fakeProps.TurboBoost || fakeProps.Boost || 0));
 
-            document.getElementById('gauge-speed').style.width = Math.min(100, (speed / 200) * 100) + '%';
+            drawGauge('gauge-speed-svg', speed / 200, '#4af626');
             document.getElementById('value-speed').textContent = speed + ' mph';
 
-            document.getElementById('gauge-rpm').style.width = Math.min(100, (rpm / 8000) * 100) + '%';
+            drawGauge('gauge-rpm-svg', rpm / 8000, rpm > 7000 ? '#ff4747' : '#ffff00');
             document.getElementById('value-rpm').textContent = Math.round(rpm / 100) * 100;
 
-            document.getElementById('gauge-fuel').style.width = fuel + '%';
+            drawGauge('gauge-fuel-svg', fuel / 100, fuel > 25 ? '#4af626' : '#ff4747');
             document.getElementById('value-fuel').textContent = fuel + '%';
 
-            const tempPercent = Math.max(0, Math.min(100, ((temp - 60) / 60) * 100));
-            document.getElementById('gauge-temp').style.width = tempPercent + '%';
+            const tempPercent = Math.max(0, Math.min(100, ((temp - 60) / 60) * 100)) / 100;
+            drawGauge('gauge-temp-svg', tempPercent, temp > 100 ? '#ff4747' : '#4af626');
             document.getElementById('value-temp').textContent = temp + '°C';
 
-            document.getElementById('gauge-boost').style.width = Math.min(100, (boost / 30) * 100) + '%';
+            drawGauge('gauge-boost-svg', boost / 30, '#ff4747');
             document.getElementById('value-boost').textContent = boost + ' psi';
         }
 
