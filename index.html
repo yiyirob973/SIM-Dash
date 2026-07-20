@@ -10,8 +10,8 @@
             --panel: #1e1e1e;
             --text: #e0e0e0;
             --accent: #ff4747;
-            --lcd-bg: #79a013; /* Classic HD44780 Green */
-            --lcd-text: #1a2408; /* Dark LCD Pixels */
+            --lcd-bg: #79a013;
+            --lcd-text: #1a2408;
             --bezel: #222;
         }
         
@@ -36,7 +36,7 @@
             flex-direction: column;
             gap: 25px;
             width: 100%;
-            max-width: 1000px;
+            max-width: 1200px;
         }
 
         /* Hardware LCD Styling */
@@ -48,10 +48,11 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.1);
             position: relative;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
         }
         
-        /* Faux Hardware Screws */
         .screw {
             position: absolute;
             width: clamp(8px, 2vw, 12px);
@@ -65,6 +66,13 @@
         .screw.bl { bottom: 10px; left: 10px; transform: rotate(75deg); }
         .screw.br { bottom: 10px; right: 10px; transform: rotate(115deg); }
 
+        .lcd-display {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
         .lcd-screen {
             background-color: var(--lcd-bg);
             color: var(--lcd-text);
@@ -77,9 +85,92 @@
             box-shadow: inset 2px 2px 10px rgba(0,0,0,0.4);
             white-space: pre;
             line-height: 1.2;
-            width: 16ch; /* Exactly 16 characters wide */
+            width: 16ch;
             overflow: hidden;
             text-shadow: 1px 1px 0px rgba(135, 175, 35, 0.6);
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Gauge Cluster - Analog */
+        .gauge-cluster {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .analog-gauge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gauge-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gauge-canvas {
+            width: 120px;
+            height: 120px;
+        }
+
+        .gauge-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #4af626;
+            font-family: 'Courier New', monospace;
+        }
+
+        .data-mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 71, 71, 0.05);
+            border-radius: 6px;
+            border: 1px solid #444;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .checkbox-label input {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+
+        .mode-indicator {
+            margin-left: auto;
+            padding: 4px 8px;
+            background: rgba(74, 246, 38, 0.2);
+            border: 1px solid #4af626;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #4af626;
+        }
+
+        .mode-indicator.fallback {
+            background: rgba(255, 71, 71, 0.2);
+            border-color: #ff4747;
+            color: #ff4747;
         }
 
         /* Controls Panel */
@@ -120,7 +211,6 @@
         }
         select:focus { outline: none; border-color: var(--accent); }
 
-        /* Code Output Area */
         .output-header { 
             display: flex; 
             justify-content: space-between; 
@@ -171,7 +261,7 @@
             font-size: 13px;
         }
         .sim-preview {
-            background: #071; /* darker green */
+            background: #071;
             color: #081; 
             padding: 10px;
             border-radius: 4px;
@@ -190,11 +280,10 @@
         .kv-list { max-height: 200px; overflow: auto; }
         .kv { display:flex; justify-content:space-between; border-bottom:1px dashed #223322; padding:6px 0; }
 
-        /* Mobile specific tweaks */
         @media (max-width: 900px) {
             .simulator { grid-template-columns: 1fr; }
             .line-grid { grid-template-columns: 1fr 1fr; }
-            .lcd-screen { padding: 10px; }
+            .gauge-cluster { grid-template-columns: repeat(2, 1fr); }
             textarea { height: 240px; }
         }
     </style>
@@ -205,11 +294,49 @@
     <p>Build your ultimate 16x2 Sim Racing display. You can mix and match up to 4 data points per line. The engine will automatically space them and write the logic for SimHub.</p>
 
     <div class="container">
-        <!-- Live Preview -->
+        <!-- Live Preview with Gauges -->
         <div class="hardware-bezel">
             <div class="screw tl"></div><div class="screw tr"></div>
             <div class="screw bl"></div><div class="screw br"></div>
-            <div class="lcd-screen" id="lcd-preview">GEAR:N    120fps<br>00:00      14.2k</div>
+
+            <div class="lcd-display">
+                <div class="lcd-screen" id="lcd-preview">G:N          \nRPM:0    FPS</div>
+                <div class="gauge-cluster">
+                    <div class="analog-gauge">
+                        <div class="gauge-label">Speed</div>
+                        <canvas class="gauge-canvas" id="gauge-speed"></canvas>
+                        <div class="gauge-value" id="value-speed">0 mph</div>
+                    </div>
+                    <div class="analog-gauge">
+                        <div class="gauge-label">RPM</div>
+                        <canvas class="gauge-canvas" id="gauge-rpm"></canvas>
+                        <div class="gauge-value" id="value-rpm">0</div>
+                    </div>
+                    <div class="analog-gauge">
+                        <div class="gauge-label">Fuel</div>
+                        <canvas class="gauge-canvas" id="gauge-fuel"></canvas>
+                        <div class="gauge-value" id="value-fuel">0%</div>
+                    </div>
+                    <div class="analog-gauge">
+                        <div class="gauge-label">Temp</div>
+                        <canvas class="gauge-canvas" id="gauge-temp"></canvas>
+                        <div class="gauge-value" id="value-temp">0°C</div>
+                    </div>
+                    <div class="analog-gauge">
+                        <div class="gauge-label">Boost</div>
+                        <canvas class="gauge-canvas" id="gauge-boost"></canvas>
+                        <div class="gauge-value" id="value-boost">0 psi</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-mode-toggle">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="useGameData" checked onchange="toggleDataMode()">
+                    Use Game Data
+                </label>
+                <div class="mode-indicator" id="modeIndicator">LIVE DATA</div>
+            </div>
         </div>
 
         <!-- Configuration Controls -->
@@ -271,7 +398,7 @@
                     </div>
 
                     <div class="sim-box" style="overflow:auto;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;\"><strong>Key / Value</strong><small style="color:#9f9">semicolon-delimited</small></div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong>Key / Value</strong><small style="color:#9f9">semicolon-delimited</small></div>
                         <div id="sim-kv" class="kv-list"></div>
                     </div>
                 </div>
@@ -281,7 +408,6 @@
     </div>
 
     <script>
-        // Expanded Library of Telemetry Items (fixed delta and added boost)
         const lib = {
             empty: { label: "- Empty -", preview: "", code: `""` },
             gearFull: { label: "Gear (GEAR: 4)", preview: "GEAR: 4", code: `("GEAR: " + String($prop('Gear') || 'N'))` },
@@ -303,7 +429,8 @@
             boost: { label: "Boost (psi)", preview: "8psi", code: `((Math.max(0, Math.round($prop('TurboBoost') || $prop('Boost') || 0))) + "psi")` }
         };
 
-        // Initialize Dropdowns
+        let useGameData = true;
+
         window.onload = () => {
             const selects = document.querySelectorAll('select');
             selects.forEach(el => {
@@ -314,7 +441,6 @@
                 }
             });
 
-            // Set dynamic defaults
             document.getElementById('l1_s1').value = 'gearShort';
             document.getElementById('l1_s2').value = 'speedMph';
             document.getElementById('l1_s4').value = 'fps';
@@ -322,18 +448,123 @@
             document.getElementById('l2_s1').value = 'lapCur';
             document.getElementById('l2_s4').value = 'dist';
 
-            // Prepare default fake props
             resetFakeProps();
-
             updateUI();
 
-            // Auto-run simulator when code changes or props edited
             document.getElementById('fake-props').addEventListener('input', () => {
                 debounce(runSimulator, 300)();
             });
         };
 
-        // Layout Engine: Distributes items evenly across 16 characters for HTML Preview
+        function toggleDataMode() {
+            useGameData = document.getElementById('useGameData').checked;
+            const indicator = document.getElementById('modeIndicator');
+            if (useGameData) {
+                indicator.textContent = 'LIVE DATA';
+                indicator.classList.remove('fallback');
+            } else {
+                indicator.textContent = 'FALLBACK';
+                indicator.classList.add('fallback');
+            }
+            runSimulator();
+        }
+
+        function drawAnalogGauge(canvasId, value, max, unit, color) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size * 0.35;
+
+            // Clear
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, size, size);
+
+            // Draw gauge background circle
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Draw scale (0-180 degrees)
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 10; i++) {
+                const angle = (i / 10) * Math.PI;
+                const x1 = centerX + Math.cos(angle - Math.PI / 2) * (radius - 5);
+                const y1 = centerY + Math.sin(angle - Math.PI / 2) * (radius - 5);
+                const x2 = centerX + Math.cos(angle - Math.PI / 2) * (radius - 12);
+                const y2 = centerY + Math.sin(angle - Math.PI / 2) * (radius - 12);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                // Draw numbers
+                if (i % 2 === 0) {
+                    const numX = centerX + Math.cos(angle - Math.PI / 2) * (radius - 22);
+                    const numY = centerY + Math.sin(angle - Math.PI / 2) * (radius - 22);
+                    ctx.fillStyle = '#888';
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(Math.round((i / 10) * max), numX, numY);
+                }
+            }
+
+            // Draw colored zones
+            const percentage = Math.min(1, value / max);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius - 8, -Math.PI / 2, -Math.PI / 2 + percentage * Math.PI, false);
+            ctx.stroke();
+
+            // Draw needle
+            const needleAngle = -Math.PI / 2 + percentage * Math.PI;
+            const needleX = centerX + Math.cos(needleAngle) * (radius - 15);
+            const needleY = centerY + Math.sin(needleAngle) * (radius - 15);
+
+            ctx.strokeStyle = '#4af626';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(needleX, needleY);
+            ctx.stroke();
+
+            // Draw center dot
+            ctx.fillStyle = '#4af626';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function updateGauges(fakeProps) {
+            const speed = Math.round(fakeProps.SpeedMph || 0);
+            const rpm = Math.round(fakeProps.Rpms || 0);
+            const fuel = Math.round(fakeProps.DataCorePlugin?.Computed?.Fuel_Percent || 0);
+            const temp = Math.round(fakeProps.WaterTemperature || 0);
+            const boost = Math.max(0, Math.round(fakeProps.TurboBoost || fakeProps.Boost || 0));
+
+            drawAnalogGauge('gauge-speed', speed, 200, 'mph', '#4af626');
+            document.getElementById('value-speed').textContent = speed + ' mph';
+
+            drawAnalogGauge('gauge-rpm', rpm, 8000, 'rpm', '#ffff00');
+            document.getElementById('value-rpm').textContent = Math.round(rpm / 100) * 100;
+
+            drawAnalogGauge('gauge-fuel', fuel, 100, '%', fuel > 25 ? '#4af626' : '#ff4747');
+            document.getElementById('value-fuel').textContent = fuel + '%';
+
+            drawAnalogGauge('gauge-temp', Math.min(temp, 120), 120, '°C', temp > 100 ? '#ff4747' : '#4af626');
+            document.getElementById('value-temp').textContent = temp + '°C';
+
+            drawAnalogGauge('gauge-boost', boost, 30, 'psi', '#ff4747');
+            document.getElementById('value-boost').textContent = boost + ' psi';
+        }
+
         function generateHTMLPreview(items) {
             let active = items.filter(s => s.preview !== "");
             if(active.length === 0) return "                ";
@@ -353,7 +584,6 @@
             }
         }
 
-        // JS Code Generator Engine: Writes dynamic spacing math for SimHub based on selection
         function generateSimhubCode(items, varName) {
             let active = items.filter(s => s.code !== '""');
             if(active.length === 0) return `    let ${varName} = "                ";`;
@@ -379,16 +609,14 @@
             }
         }
 
-        // Main Update Loop
         function updateUI() {
-            // Retrieve item objects based on dropdown values
             let l1 = ['l1_s1', 'l1_s2', 'l1_s3', 'l1_s4'].map(id => lib[document.getElementById(id).value]);
             let l2 = ['l2_s1', 'l2_s2', 'l2_s3', 'l2_s4'].map(id => lib[document.getElementById(id).value]);
 
-            // Update HTML LCD Preview
-            document.getElementById('lcd-preview').innerHTML = generateHTMLPreview(l1) + "<br>" + generateHTMLPreview(l2);
+            const line1 = generateHTMLPreview(l1);
+            const line2 = generateHTMLPreview(l2);
+            document.getElementById('lcd-preview').textContent = line1 + '\n' + line2;
 
-            // Generate Final SimHub JavaScript Payload (aligned with example_simhub_javascript.js)
             const simHubCode = `// 1. Establish core state
 let isGameRunning = $prop('DataCorePlugin.GameRunning');
 
@@ -399,12 +627,9 @@ let speed = 0;
 let tach = 0;
 let temp = 0;
 let fuel = 0;
-let boost = 0; // New data field
-let now = new Date();
-let hours = now.getHours().toString().padStart(2, '0');
-let minutes = now.getMinutes().toString().padStart(2, '0');
-let lcd1 = "     " + hours + ":" + minutes; 
-let lcd2 = "";
+let boost = 0;
+let lcd1 = "                "; 
+let lcd2 = "                ";
 
 // 3. Populate live telemetry
 if (isGameRunning) {
@@ -414,11 +639,9 @@ if (isGameRunning) {
     temp = Math.round($prop('WaterTemperature')) || 0;
     fuel = Math.round($prop('DataCorePlugin.Computed.Fuel_Percent')) || 0;
     
-    // Safely capture boost metrics (fallback to 0 if N/A or atmospheric)
     boost = Math.round($prop('TurboBoost')) || Math.round($prop('Boost')) || 0;
-    if (boost < 0) boost = 0; // Prevent reverse needle bounce from vacuum pressures
+    if (boost < 0) boost = 0;
     
-    // Shift Light Logic
     if ($prop('CarSettings_RPMShiftLight2') == 1) {
         shiftLight = 2;
     } else if ($prop('CarSettings_RPMShiftLight1') == 1) {
@@ -432,7 +655,7 @@ ${generateSimhubCode(l1, 'lcd1')}
 ${generateSimhubCode(l2, 'lcd2')}
 }
 
-// 4. Final safety pass (strip out semicolons to preserve token processing boundaries)
+// 4. Final safety pass
 lcd1 = String(lcd1).replace(/;/g, '').substring(0,16).padEnd(16, ' ');
 lcd2 = String(lcd2).replace(/;/g, '').substring(0,16).padEnd(16, ' ');
 
@@ -444,19 +667,16 @@ output += "V=" + speed + ";";
 output += "R=" + tach + ";";
 output += "T=" + temp + ";";
 output += "F=" + fuel + ";";
-output += "B=" + boost + ";"; // Append boost data
+output += "B=" + boost + ";";
 output += "L1=" + lcd1 + ";";
 output += "L2=" + lcd2 + ";";
 
 return output + "\\n";`;
 
             document.getElementById('code-output').value = simHubCode;
-
-            // Update simulator automatically
             debounce(runSimulator, 100)();
         }
 
-        // Copy to clipboard
         function copyCode() {
             const el = document.getElementById('code-output');
             el.select(); document.execCommand('copy');
@@ -469,7 +689,6 @@ return output + "\\n";`;
             }, 2500);
         }
 
-        // ---------------- Simulator Engine -----------------
         const defaultFakeProps = {
             "DataCorePlugin": { "GameRunning": true, "Computed": { "Fuel_Percent": 78 } },
             "EngineIgnitionOn": true,
@@ -485,8 +704,29 @@ return output + "\\n";`;
             "GameRawData": { "DistanceToFinish": 14200 },
             "CurrentLapTimeFormatted": "01:22",
             "LastLapTimeFormatted": "01:24",
+            "BestLapTimeFormatted": "01:20",
             "SessionBestLiveDeltaSeconds": 0.4,
             "Position": 1
+        };
+
+        const fallbackProps = {
+            "DataCorePlugin": { "GameRunning": false, "Computed": { "Fuel_Percent": 0 } },
+            "EngineIgnitionOn": false,
+            "SpeedMph": 0,
+            "Rpms": 0,
+            "WaterTemperature": 60,
+            "TurboBoost": 0,
+            "Boost": 0,
+            "CarSettings_RPMShiftLight1": 0,
+            "CarSettings_RPMShiftLight2": 0,
+            "Gear": "N",
+            "AfterburnerPlugin": { "Framerate_FPS": 0 },
+            "GameRawData": { "DistanceToFinish": 0 },
+            "CurrentLapTimeFormatted": "00:00",
+            "LastLapTimeFormatted": "00:00",
+            "BestLapTimeFormatted": "00:00",
+            "SessionBestLiveDeltaSeconds": 0,
+            "Position": 0
         };
 
         function resetFakeProps() {
@@ -496,7 +736,6 @@ return output + "\\n";`;
 
         function randomizeFakeProps() {
             const p = JSON.parse(document.getElementById('fake-props').value || '{}');
-            // mutate a few common props
             p.DataCorePlugin = p.DataCorePlugin || {};
             p.DataCorePlugin.Computed = p.DataCorePlugin.Computed || {};
             p.DataCorePlugin.GameRunning = Math.random() > 0.1;
@@ -505,7 +744,7 @@ return output + "\\n";`;
             p.SpeedMph = Math.floor(Math.random() * 200);
             p.Rpms = Math.floor(Math.random() * 8000);
             p.WaterTemperature = 70 + Math.floor(Math.random() * 40);
-            p.TurboBoost = Math.floor(Math.random() * 30) - 2; // some negative values possible
+            p.TurboBoost = Math.floor(Math.random() * 30) - 2;
             p.Boost = Math.floor(Math.random() * 30);
             p.CarSettings_RPMShiftLight1 = Math.random() > 0.7 ? 1 : 0;
             p.CarSettings_RPMShiftLight2 = Math.random() > 0.85 ? 1 : 0;
@@ -514,6 +753,7 @@ return output + "\\n";`;
             p.GameRawData = { DistanceToFinish: Math.floor(Math.random() * 20000) };
             p.CurrentLapTimeFormatted = "01:" + String(Math.floor(Math.random() * 60)).padStart(2, '0');
             p.LastLapTimeFormatted = "01:" + String(Math.floor(Math.random() * 60)).padStart(2, '0');
+            p.BestLapTimeFormatted = "01:" + String(Math.floor(Math.random() * 60)).padStart(2, '0');
             p.SessionBestLiveDeltaSeconds = (Math.random() * 5 - 2.5).toFixed(1);
             p.Position = Math.ceil(Math.random() * 20);
             document.getElementById('fake-props').value = JSON.stringify(p, null, 2);
@@ -531,30 +771,28 @@ return output + "\\n";`;
 
         function getFakeProps() {
             try {
-                return JSON.parse(document.getElementById('fake-props').value || '{}');
+                let props = JSON.parse(document.getElementById('fake-props').value || '{}');
+                if (!useGameData) {
+                    props = JSON.parse(JSON.stringify(fallbackProps));
+                }
+                return props;
             } catch (e) {
-                return {};
+                return useGameData ? {} : fallbackProps;
             }
         }
 
-        // $prop helper supporting dotted paths
         function makePropAccessor(fakeProps) {
             return function (key) {
                 try {
-                    // support dotted and nested keys and underscores
                     if (!key) return undefined;
                     const parts = key.split('.');
                     let cur = fakeProps;
                     for (let p of parts) {
                         if (cur === undefined || cur === null) return undefined;
-                        // try property as-is
                         if (p in cur) { cur = cur[p]; continue; }
-                        // fallback: underscores to nested access (e.g., DataCorePlugin.Computed.Fuel_Percent handled above)
-                        // try raw key
                         if (p.includes('_')) {
                             if (p in cur) { cur = cur[p]; continue; }
                         }
-                        // if not found, return undefined
                         return undefined;
                     }
                     return cur;
@@ -567,10 +805,11 @@ return output + "\\n";`;
             const fakeProps = getFakeProps();
             const $prop = makePropAccessor(fakeProps);
 
-            // Execute generated code safely and capture output
+            // Update gauges
+            updateGauges(fakeProps);
+
             let raw = '(error)';
             try {
-                // Build function that has $prop in scope
                 const fn = new Function('$prop', code);
                 const res = fn($prop);
                 raw = String(res);
@@ -580,7 +819,6 @@ return output + "\\n";`;
 
             document.getElementById('sim-raw').textContent = raw;
 
-            // Parse semicolon-delimited key-values
             const kvContainer = document.getElementById('sim-kv');
             kvContainer.innerHTML = '';
             const parts = raw.split(';').filter(s => s.trim().length > 0);
@@ -596,18 +834,14 @@ return output + "\\n";`;
                 kvContainer.appendChild(row);
             });
 
-            // Update LCD preview
             const l1 = map['L1'] || '                ';
             const l2 = map['L2'] || '                ';
             const lcdEl = document.getElementById('sim-lcd');
-            // show two lines
             lcdEl.textContent = l1.substring(0,16) + '\n' + l2.substring(0,16);
 
-            // Also update top hardware preview for visual parity
-            document.getElementById('lcd-preview').innerHTML = (l1.substring(0,16)).replace(/ /g, '&nbsp;') + '<br>' + (l2.substring(0,16)).replace(/ /g, '&nbsp;');
+            document.getElementById('lcd-preview').textContent = l1.substring(0,16) + '\n' + l2.substring(0,16);
         }
 
-        // Simple debounce
         function debounce(fn, delay) {
             let t;
             return function(...args) {
