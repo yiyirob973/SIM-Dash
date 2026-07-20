@@ -3,7 +3,7 @@ let isGameRunning = $prop('DataCorePlugin.GameRunning');
 
 // 2. Declare default standby states
 let shiftLight = 0;
-let engineLight = 1;
+let engineLight = 0;
 let speed = 0;
 let tach = 0;
 let temp = 0;
@@ -17,7 +17,7 @@ let lcd2 = "";
 
 // 3. Populate live telemetry
 if (isGameRunning) {
-    engineLight = $prop('EngineIgnitionOn') ? 1 : 0;
+    engineLight = $prop('EngineIgnitionOn') ? 0 : 1;
     speed = Math.round($prop('SpeedMph')) || 0;
     tach = Math.round($prop('Rpms')) || 0;
     temp = Math.round($prop('WaterTemperature')) || 0;
