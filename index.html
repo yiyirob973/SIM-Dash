@@ -260,23 +260,6 @@
             font-family: 'Courier New', monospace;
             font-size: 13px;
         }
-        .sim-preview {
-            background: #071;
-            color: #081; 
-            padding: 10px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            text-shadow: none;
-            white-space: pre;
-            width: 16ch;
-            height: 3.2em;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
         .kv-list { max-height: 200px; overflow: auto; }
         .kv { display:flex; justify-content:space-between; border-bottom:1px dashed #223322; padding:6px 0; }
 
@@ -399,11 +382,8 @@
                     </div>
 
                     <div class="sim-box">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <strong>LCD Preview</strong>
-                            <small style="color:#9f9">Parsed lines</small>
-                        </div>
-                        <div class="sim-preview" id="sim-lcd">                \n                </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong>Key / Value</strong><small style="color:#9f9">semicolon-delimited</small></div>
+                        <div id="sim-kv" class="kv-list"></div>
                     </div>
                 </div>
             </div>
@@ -866,9 +846,6 @@ return parts.join(';') + ';' + '\\n';`;
 
             const l1 = map['L1'] || '                ';
             const l2 = map['L2'] || '                ';
-            const lcdEl = document.getElementById('sim-lcd');
-            lcdEl.textContent = l1.substring(0,16) + '\n' + l2.substring(0,16);
-
             document.getElementById('lcd-preview').textContent = l1.substring(0,16) + '\n' + l2.substring(0,16);
         }
 
