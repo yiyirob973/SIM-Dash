@@ -1,69 +1,80 @@
 // 1. Establish core state
-let isGameRunning = $prop('DataCorePlugin.GameRunning');
+const isGameRunning = $prop('DataCorePlugin.GameRunning');
 
-// 2. Declare default standby states
+// helpers
+const get = (k) => $prop(k);
+const roundProp = (k) => Math.round(get(k) || 0);
+const safeStr = (v) => String(v == null ? '' : v);
+const sanitizeLine = (s) => safeStr(s).replace(/;/g, '').substring(0, 16).padEnd(16, ' ');
+
+// 2. Defaults / standby placeholders
 let shiftLight = 0;
 let engineLight = 0;
 let speed = 0;
 let tach = 0;
 let temp = 0;
 let fuel = 0;
-let boost = 0; // New data field
-let now = new Date();
-let hours = now.getHours().toString().padStart(2, '0');
-let minutes = now.getMinutes().toString().padStart(2, '0');
-let lcd1 = "     " + hours + ":" + minutes; 
-let lcd2 = "";
+let boost = 0;
 
-// 3. Populate live telemetry
+let lcd1 = ''.padEnd(16, ' ');
+let lcd2 = ''.padEnd(16, ' ');
+
+// 3. Populate live telemetry or show standby clock when not running
 if (isGameRunning) {
-    engineLight = $prop('EngineIgnitionOn') ? 0 : 1;
-    speed = Math.round($prop('SpeedMph')) || 0;
-    tach = Math.round($prop('Rpms')) || 0;
-    temp = Math.round($prop('WaterTemperature')) || 0;
-    fuel = Math.round($prop('DataCorePlugin.Computed.Fuel_Percent')) || 0;
-    
-    // Safely capture boost metrics (fallback to 0 if N/A or atmospheric)
-    boost = Math.round($prop('TurboBoost')) || Math.round($prop('Boost')) || 0;
-    if (boost < 0) boost = 0; // Prevent reverse needle bounce from vacuum pressures
-    
-    // Shift Light Logic
-    if ($prop('CarSettings_RPMShiftLight2') == 1) {
-        shiftLight = 2;
-    } else if ($prop('CarSettings_RPMShiftLight1') == 1) {
-        shiftLight = 1;
-    }
-    
-    // LCD Line 1: Gear & FPS
-    let drive = $prop('Gear') || 'N';
-    let fps = Math.round($prop('AfterburnerPlugin.Framerate_FPS') || 0).toString();
-    let topSpacer = 16 - drive.toString().length - fps.length;
-    lcd1 = drive + " ".repeat(Math.max(0, topSpacer)) + fps;
-    
-    // LCD Line 2: Lap Time & Distance Remaining
-    let distRaw = $prop('GameRawData.DistanceToFinish') || 0;
-    let distFormatted = (distRaw / 1000).toFixed(1) + "k";
-    let lapTime = (distRaw <= 0) ?  $prop('LastLapTime').toString('mm\\:ss') : $prop('CurrentLapTime').toString('mm\\:ss');
-    let cleanLap = (lapTime || "00:00").substring(0, 5).padEnd(5, ' ');
-    
-    let bottomSpacer = 16 - cleanLap.length - distFormatted.length;
-    lcd2 = cleanLap + " ".repeat(Math.max(0, bottomSpacer)) + distFormatted;
+  // preserve original polarity as in source
+  engineLight = get('EngineIgnitionOn') ? 0 : 1;
+  speed = roundProp('SpeedMph');
+  tach = roundProp('Rpms');
+  temp = roundProp('WaterTemperature');
+  fuel = roundProp('DataCorePlugin.Computed.Fuel_Percent');
+
+  // boost fallback chain
+  boost = roundProp('TurboBoost') || roundProp('Boost') || 0;
+  if (boost < 0) boost = 0;
+
+  // shift light
+  if (get('CarSettings_RPMShiftLight2') == 1) shiftLight = 2;
+  else if (get('CarSettings_RPMShiftLight1') == 1) shiftLight = 1;
+
+  // LCD Line 1: Gear & FPS
+  const drive = get('Gear') || 'N';
+  const fps = roundProp('AfterburnerPlugin.Framerate_FPS').toString();
+  const topSpacer = Math.max(0, 16 - String(drive).length - fps.length);
+  lcd1 = `${drive}${' '.repeat(topSpacer)}${fps}`;
+
+  // LCD Line 2: Lap Time & Distance Remaining
+  const distRaw = get('GameRawData.DistanceToFinish') || 0;
+  const distFormatted = `${(distRaw / 1000).toFixed(1)}k`;
+
+  // Use only formatted lap time props
+  const lapFormatted = get('CurrentLapTimeFormatted') || get('LastLapTimeFormatted') || '00:00';
+  const cleanLap = String(lapFormatted).substring(0, 5).padEnd(5, ' ');
+
+  const bottomSpacer = Math.max(0, 16 - cleanLap.length - distFormatted.length);
+  lcd2 = `${cleanLap}${' '.repeat(bottomSpacer)}${distFormatted}`;
+} else {
+  // Only compute Date/standby when not running (micro-optimization)
+  const now = new Date();
+  const standby = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  lcd1 = `     ${standby}`.substring(0, 16).padEnd(16, ' ');
+  lcd2 = ''.padEnd(16, ' ');
 }
 
-// 4. Final safety pass (strip out semicolons to preserve token processing boundaries)
-lcd1 = lcd1.replace(/;/g, '');
-lcd2 = lcd2.replace(/;/g, '');
+// 4. Sanitize & enforce 16 chars
+lcd1 = sanitizeLine(lcd1);
+lcd2 = sanitizeLine(lcd2);
 
-// 5. Construct modular tokenized output
-let output = "";
-output += "S=" + shiftLight + ";";
-output += "E=" + engineLight + ";";
-output += "V=" + speed + ";";
-output += "R=" + tach + ";";
-output += "T=" + temp + ";";
-output += "F=" + fuel + ";";
-output += "B=" + boost + ";"; // Append boost data
-output += "L1=" + lcd1 + ";";
-output += "L2=" + lcd2 + ";";
+// 5. Construct modular tokenized output efficiently
+const parts = [
+  `S=${shiftLight}`,
+  `E=${engineLight}`,
+  `V=${speed}`,
+  `R=${tach}`,
+  `T=${temp}`,
+  `F=${fuel}`,
+  `B=${boost}`,
+  `L1=${lcd1}`,
+  `L2=${lcd2}`
+];
 
-return output + "\n";
+return parts.join(';') + ';' + '\n';
