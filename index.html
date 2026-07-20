@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimHub Dash Configurator Pro</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --text: #e0e0e0;
+            --accent: #ff4747;
+            --lcd-bg: #79a013; /* Classic HD44780 Green */
+            --lcd-text: #1a2408; /* Dark LCD Pixels */
+            --bezel: #222;
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        h1 { color: var(--accent); margin-bottom: 5px; text-align: center; font-size: clamp(24px, 5vw, 32px); }
+        p { color: #888; margin-bottom: 25px; text-align: center; max-width: 700px; font-size: 14px; line-height: 1.5; }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* Hardware LCD Styling */
+        .hardware-bezel {
+            background: var(--bezel);
+            padding: clamp(10px, 4vw, 25px);
+            border-radius: 12px;
+            border: 2px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.1);
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+        
+        /* Faux Hardware Screws */
+        .screw {
+            position: absolute;
+            width: clamp(8px, 2vw, 12px);
+            height: clamp(8px, 2vw, 12px);
+            background: #444;
+            border-radius: 50%;
+            box-shadow: inset 1px 1px 2px #111, inset -1px -1px 2px #666;
+        }
+        .screw.tl { top: 10px; left: 10px; transform: rotate(45deg); }
+        .screw.tr { top: 10px; right: 10px; transform: rotate(15deg); }
+        .screw.bl { bottom: 10px; left: 10px; transform: rotate(75deg); }
+        .screw.br { bottom: 10px; right: 10px; transform: rotate(115deg); }
+
+        .lcd-screen {
+            background-color: var(--lcd-bg);
+            color: var(--lcd-text);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: clamp(22px, 6vw, 36px);
+            font-weight: 900;
+            padding: 10px 15px;
+            border-radius: 4px;
+            border: 3px solid #000;
+            box-shadow: inset 2px 2px 10px rgba(0,0,0,0.4);
+            white-space: pre;
+            line-height: 1.2;
+            width: 16ch; /* Exactly 16 characters wide */
+            overflow: hidden;
+            text-shadow: 1px 1px 0px rgba(135, 175, 35, 0.6);
+        }
+
+        /* Controls Panel */
+        .controls-card {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .controls-card h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #ccc;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .line-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 12px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        
+        select {
+            padding: 10px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            width: 100%;
+        }
+        select:focus { outline: none; border-color: var(--accent); }
+
+        /* Code Output Area */
+        .output-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+        }
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover { background: #ff2a2a; transform: scale(1.02); }
+        
+        textarea {
+            width: 100%;
+            height: 350px;
+            background: #0a0a0a;
+            color: #4af626;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            resize: vertical;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        /* Mobile specific tweaks */
+        @media (max-width: 500px) {
+            .line-grid { grid-template-columns: 1fr 1fr; }
+            .lcd-screen { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Dashboard Configurator</h1>
+    <p>Build your ultimate 16x2 Sim Racing display. You can mix and match up to 4 data points per line. The engine will automatically space them and write the logic for SimHub.</p>
+
+    <div class="container">
+        <!-- Live Preview -->
+        <div class="hardware-bezel">
+            <div class="screw tl"></div><div class="screw tr"></div>
+            <div class="screw bl"></div><div class="screw br"></div>
+            <div class="lcd-screen" id="lcd-preview">GEAR:N    120fps<br>00:00      14.2k</div>
+        </div>
+
+        <!-- Configuration Controls -->
+        <div class="controls-card">
+            <h3>Top Screen (Line 1)</h3>
+            <div class="line-grid" id="line1-controls">
+                <div class="control-group"><label>Slot 1</label><select id="l1_s1" onchange="updateUI()"></select></div>
+                <div class="control-group"><label>Slot 2</label><select id="l1_s2" onchange="updateUI()"></select></div>
+                <div class="control-group"><label>Slot 3</label><select id="l1_s3" onchange="updateUI()"></select></div>
+                <div class="control-group"><label>Slot 4</label><select id="l1_s4" onchange="updateUI()"></select></div>
+            </div>
+
+            <h3>Bottom Screen (Line 2)</h3>
+            <div class="line-grid" id="line2-controls">
+                <div class="control-group"><label>Slot 1</label><select id="l2_s1" onchange="updateUI()"></select></div>
+                <div class="control-group"><label>Slot 2</label><select id="l2_s2" onchange="updateUI()"></select></div>
+                <div class="control-group"><label>Slot 3</label><select id="l2_s3" onchange="updateUI()"></select></div>
+                <div class="control-group"><label>Slot 4</label><select id="l2_s4" onchange="updateUI()"></select></div>
+            </div>
+        </div>
+
+        <!-- Generated Code -->
+        <div>
+            <div class="output-header">
+                <h3 style="margin:0; color:#ccc;">Generated SimHub JavaScript</h3>
+                <button onclick="copyCode()" id="copyBtn">Copy Logic</button>
+            </div>
+            <textarea id="code-output" readonly spellcheck="false"></textarea>
+        </div>
+    </div>
+
+    <script>
+        // Expanded Library of Telemetry Items
+        const lib = {
+            empty: { label: "- Empty -", preview: "", code: `""` },
+            gearFull: { label: "Gear (GEAR: 4)", preview: "GEAR: 4", code: `("GEAR: " + String($prop('Gear') || 'N'))` },
+            gearShort: { label: "Gear Short (G:4)", preview: "G:4", code: `("G:" + String($prop('Gear') || 'N'))` },
+            speedMph: { label: "Speed (MPH)", preview: "125mph", code: `(String(Math.round($prop('SpeedMph') || 0)) + "mph")` },
+            speedKmh: { label: "Speed (KMH)", preview: "200kmh", code: `(String(Math.round($prop('SpeedKmh') || 0)) + "kmh")` },
+            rpm: { label: "RPM", preview: "6500", code: `String(Math.round($prop('Rpms') || 0))` },
+            tempC: { label: "Water Temp (°C)", preview: "90c", code: `(String(Math.round($prop('WaterTemperature') || 0)) + "c")` },
+            fuelPct: { label: "Fuel (%)", preview: "75%", code: `(String(Math.round($prop('DataCorePlugin.Computed.Fuel_Percent') || 0)) + "%")` },
+            fuelL: { label: "Fuel (Liters)", preview: "35L", code: `(String(Math.round($prop('Fuel') || 0)) + "L")` },
+            fps: { label: "FPS", preview: "120fps", code: `(String(Math.round($prop('AfterburnerPlugin.Framerate_FPS') || 0)) + "fps")` },
+            pos: { label: "Position (P:1)", preview: "P:1", code: `("P:" + String($prop('Position') || 1))` },
+            lapCur: { label: "Current Lap Time", preview: "01:22", code: `String($prop('CurrentLapTimeFormatted') || "00:00").substring(0, 5)` },
+            lapBest: { label: "Best Lap Time", preview: "B01:20", code: `("B" + String($prop('BestLapTimeFormatted') || "--:--").substring(0, 5))` },
+            lapLast: { label: "Last Lap Time", preview: "L01:24", code: `("L" + String($prop('LastLapTimeFormatted') || "--:--").substring(0, 5))` },
+            delta: { label: "Delta (+0.4s)", preview: "+0.4s", code: `((($prop('SessionBestLiveDeltaSeconds') || 0) > 0 ? "+" : "") + String(($prop('SessionBestLiveDeltaSeconds') || 0).toFixed(1)) + "s")` },
+            dist: { label: "Distance to Finish", preview: "14.2k", code: `((($prop('GameRawData.DistanceToFinish') || 0) / 1000).toFixed(1) + "k")` },
+            clock: { label: "System Clock", preview: "14:30", code: `(String(new Date().getHours()).padStart(2, '0') + ":" + String(new Date().getMinutes()).padStart(2, '0'))` }
+        };
+
+        // Initialize Dropdowns
+        window.onload = () => {
+            const selects = document.querySelectorAll('select');
+            selects.forEach(el => {
+                for (const [key, item] of Object.entries(lib)) {
+                    const opt = document.createElement('option');
+                    opt.value = key; opt.textContent = item.label;
+                    el.appendChild(opt);
+                }
+            });
+
+            // Set dynamic defaults
+            document.getElementById('l1_s1').value = 'gearShort';
+            document.getElementById('l1_s2').value = 'speedMph';
+            document.getElementById('l1_s4').value = 'fps';
+            
+            document.getElementById('l2_s1').value = 'lapCur';
+            document.getElementById('l2_s4').value = 'dist';
+            
+            updateUI();
+        };
+
+        // Layout Engine: Distributes items evenly across 16 characters for HTML Preview
+        function generateHTMLPreview(items) {
+            let active = items.filter(s => s.preview !== "");
+            if(active.length === 0) return "                ";
+            if(active.length === 1) return active[0].preview.padEnd(16, ' ').substring(0,16);
+            if(active.length === 2) {
+                let a = active[0].preview, b = active[1].preview;
+                return (a + " ".repeat(Math.max(0, 16 - a.length - b.length)) + b).substring(0,16);
+            }
+            if(active.length === 3) {
+                let a = active[0].preview, b = active[1].preview, c = active[2].preview;
+                let spaces = Math.max(0, 16 - (a.length + b.length + c.length));
+                let s1 = Math.floor(spaces / 2), s2 = Math.ceil(spaces / 2);
+                return (a + " ".repeat(s1) + b + " ".repeat(s2) + c).substring(0,16);
+            }
+            if(active.length >= 4) {
+                return active.map(a => a.preview).join(' ').padEnd(16, ' ').substring(0,16);
+            }
+        }
+
+        // JS Code Generator Engine: Writes dynamic spacing math for SimHub based on selection
+        function generateSimhubCode(items, varName) {
+            let active = items.filter(s => s.code !== '""');
+            if(active.length === 0) return `    let ${varName} = "                ";`;
+            if(active.length === 1) return `    let ${varName} = String(${active[0].code}).padEnd(16, ' ').substring(0,16);`;
+            
+            if(active.length === 2) {
+                return `    let ${varName}_a = String(${active[0].code});
+    let ${varName}_b = String(${active[1].code});
+    let ${varName} = (${varName}_a + " ".repeat(Math.max(0, 16 - ${varName}_a.length - ${varName}_b.length)) + ${varName}_b).substring(0,16);`;
+            }
+            
+            if(active.length === 3) {
+                return `    let ${varName}_a = String(${active[0].code});
+    let ${varName}_b = String(${active[1].code});
+    let ${varName}_c = String(${active[2].code});
+    let ${varName}_sp = Math.max(0, 16 - (${varName}_a.length + ${varName}_b.length + ${varName}_c.length));
+    let ${varName} = (${varName}_a + " ".repeat(Math.floor(${varName}_sp / 2)) + ${varName}_b + " ".repeat(Math.ceil(${varName}_sp / 2)) + ${varName}_c).substring(0,16);`;
+            }
+            
+            if(active.length >= 4) {
+                return `    let ${varName}_arr = [String(${active[0].code}), String(${active[1].code}), String(${active[2].code}), String(${active[3].code})];
+    let ${varName} = ${varName}_arr.join(' ').padEnd(16, ' ').substring(0,16);`;
+            }
+        }
+
+        // Main Update Loop
+        function updateUI() {
+            // Retrieve item objects based on dropdown values
+            let l1 = ['l1_s1', 'l1_s2', 'l1_s3', 'l1_s4'].map(id => lib[document.getElementById(id).value]);
+            let l2 = ['l2_s1', 'l2_s2', 'l2_s3', 'l2_s4'].map(id => lib[document.getElementById(id).value]);
+
+            // Update HTML LCD Preview
+            document.getElementById('lcd-preview').innerHTML = generateHTMLPreview(l1) + "<br>" + generateHTMLPreview(l2);
+
+            // Generate Final SimHub JavaScript Payload
+            const simHubCode = `// 1. Establish core state
+let isGameRunning = $prop('DataCorePlugin.GameRunning');
+
+// 2. Declare standby clock for main menu
+let standby = String(new Date().getHours()).padStart(2, '0') + ":" + String(new Date().getMinutes()).padStart(2, '0');
+let lcd1 = "     " + standby; 
+let lcd2 = "                "; // 16 spaces
+let shiftLight = 0, engineLight = 1, speed = 0, tach = 0, temp = 0, fuel = 0;
+
+// 3. Populate live telemetry
+if (isGameRunning) {
+    
+    // Core Hardware Gauges
+    engineLight = $prop('EngineIgnitionOn') ? 1 : 0;
+    speed = Math.round($prop('SpeedMph') || 0);
+    tach = Math.round($prop('Rpms') || 0);
+    temp = Math.round($prop('WaterTemperature') || 0);
+    fuel = Math.round($prop('DataCorePlugin.Computed.Fuel_Percent') || 0);
+    
+    // Shift Lights
+    if ($prop('CarSettings_RPMShiftLight2') == 1) { shiftLight = 2; } 
+    else if ($prop('CarSettings_RPMShiftLight1') == 1) { shiftLight = 1; }
+    
+    // --- DYNAMIC LINE 1 CONFIGURATION ---
+${generateSimhubCode(l1, 'lcd1')}
+    
+    // --- DYNAMIC LINE 2 CONFIGURATION ---
+${generateSimhubCode(l2, 'lcd2')}
+}
+
+// 4. Protection pass (strips rogue commas to protect Arduino parsing)
+lcd1 = String(lcd1).replace(/,/g, '').substring(0,16).padEnd(16, ' ');
+lcd2 = String(lcd2).replace(/,/g, '').substring(0,16).padEnd(16, ' ');
+
+// Output Serial string
+return shiftLight + "," + engineLight + "," + speed + "," + tach + "," + temp + "," + fuel + "," + lcd1 + "," + lcd2 + "\\n";`;
+
+            document.getElementById('code-output').value = simHubCode;
+        }
+
+        // Copy to clipboard
+        function copyCode() {
+            const el = document.getElementById('code-output');
+            el.select(); document.execCommand('copy');
+            const btn = document.getElementById('copyBtn');
+            btn.innerText = 'Copied to Clipboard!';
+            btn.style.background = '#4af626'; btn.style.color = '#000';
+            setTimeout(() => {
+                btn.innerText = 'Copy Logic';
+                btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
