@@ -1,43 +1,58 @@
 /* ====================================================================================
  *  SIM RACING GAUGE CLUSTER CONTROLLER (Arduino Nano)
- *  Takes comma-separated telemetry data from a PC (e.g., SimHub) and drives real 
- *  car dashboard gauges using PWM and Direct Digital Synthesis (DDS) via hardware interrupts.
  *  
- *  Data Format Expected (6 integers + 2 strings): 
- *  ShiftLight, EngineLight, Speed, RPM, Temp, Fuel, LCD_Line1, LCD_Line2\n
+ *  MODULAR KEY-VALUE (TOKEN) FORMAT:
+ *  Instead of strict comma-separated lists, the code now looks for specific identifiers.
+ *  You can send these in any order. If one is missing, the code just ignores it and 
+ *  keeps the previous value.
+ *
+ *  Tokens: 
+ *  S= (ShiftLight), E= (EngineLight), V= (Velocity/Speed), R= (RPM), 
+ *  T= (Temp), F= (Fuel), L1= (LCD Line 1), L2= (LCD Line 2)
+ *
+ *  --- EXPECTED SIMHUB JAVASCRIPT OUTPUT FORMAT ---
+ *  Delimiter between items is a semicolon (;). End of message is a newline (\n).
+ *  Example String: "S=1;E=0;V=120;R=5500;T=90;F=45;L1=GEAR: 4;L2=LAP: 1:24.33;\n"
+ *
+ *  SimHub Custom Serial Javascript Example:
+ *  var output = "";
+ *  if (shift != null) output += "S=" + shift + ";";
+ *  if (speed != null) output += "V=" + speed + ";";
+ *  output += "R=" + rpm + ";"; 
+ *  output += "L1=" + lcdLine1 + ";";
+ *  return output + "\n";
  * ==================================================================================== */
 
-#include <LiquidCrystal_I2C.h> // Library for the I2C LCD display
-#include <Wire.h>              // Standard Arduino I2C/TWI library
-#include <TimerOne.h>          // Hardware timer library used to generate clean gauge frequencies
+#include <LiquidCrystal_I2C.h> 
+#include <Wire.h>              
+#include <TimerOne.h>          
 
 // ==========================================
 // --- HARDWARE PIN CONFIGURATION ---
 // ==========================================
-#define shiftLight 3  // Shift Light (Uses Native PWM for smooth fading)
-#define engineLight 4 // Check Engine Light (Basic ON/OFF digital pin)
-#define TACH 2        // Tachometer/RPM gauge (Driven by Timer1 Interrupt for clean sound waves)
-#define TEMP 5        // Coolant Temp gauge (Uses Native PWM to output variable voltage)
-#define SP 11         // Speedometer gauge (Driven by Timer1 Interrupt to prevent thrashing)
-#define FUEL 6        // Fuel Level gauge (Uses Native PWM to output variable voltage)
-#define FIVEV 12      // Extra 5V output pin (Can be used to power small 5V accessories)
+#define shiftLight 3  
+#define engineLight 4 
+#define TACH 2        
+#define TEMP 5        
+#define SP 11         
+#define FUEL 6        
+#define FIVEV 12      
 
 // ==========================================
 // --- SERIAL PARSING VARIABLES ---
 // ==========================================
-const byte maxChars = 80;        
+const byte maxChars = 120; // Increased buffer size to account for key-value characters      
 char receivedChars[maxChars];    
-char tempChars[maxChars];        // OPTIMIZATION: Temporary buffer for safe parsing
+char tempChars[maxChars];        
 boolean newData = false;         
 
 // ==========================================
 // --- TIMEOUT FAILSAFE VARIABLES ---
 // ==========================================
 unsigned long lastValidDataTime = 0;
-const unsigned long timeoutMillis = 2000; // 2 seconds before gauges zero out
+const unsigned long timeoutMillis = 2000; 
 bool isHardwareStandby = false;
 
-// Initialize the LCD (I2C address 0x27, 16 columns, 2 rows)
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // ==========================================
@@ -67,7 +82,7 @@ volatile unsigned int speedoTickCounter = 0;
 volatile bool tachState = false;
 volatile bool speedoState = false;
 
-// OPTIMIZATION: Direct Port Manipulation for maximum CPU efficiency
+// Direct Port Manipulation for maximum CPU efficiency
 void toneISR() {
   if (tachPeriodTicks > 0) {
     tachTickCounter++;
@@ -75,7 +90,6 @@ void toneISR() {
       tachTickCounter = 0;
       tachState = !tachState; 
       
-      // Direct Port Manipulation for Pin 2 (TACH) on Port D, Bit 2
       if (tachState) { PORTD |= B00000100; }  
       else           { PORTD &= ~B00000100; } 
     }
@@ -87,7 +101,6 @@ void toneISR() {
       speedoTickCounter = 0;
       speedoState = !speedoState; 
       
-      // Direct Port Manipulation for Pin 11 (SP) on Port B, Bit 3
       if (speedoState) { PORTB |= B00001000; }  
       else             { PORTB &= ~B00001000; } 
     }
@@ -164,35 +177,46 @@ void extractAndPadString(char* source, char* destination) {
 }
 
 // ==========================================
-// --- OPTIMIZED NULL-SAFE PARSER ---
+// --- TOKEN-BASED KEY-VALUE PARSER ---
 // ==========================================
-bool parseCommaData() {
-    char * strtokIndx; 
-    int tempValues[6];
+bool parseKeyValData() {
+    char * token;
+    
+    // Split the string by the semicolon delimiter
+    token = strtok(tempChars, ";");
+    
+    while (token != NULL) {
+        // Check the prefix of each token and update the corresponding variable
+        if (strncmp(token, "S=", 2) == 0) { 
+            values[0] = atoi(token + 2); 
+        } 
+        else if (strncmp(token, "E=", 2) == 0) { 
+            values[1] = atoi(token + 2); 
+        } 
+        else if (strncmp(token, "V=", 2) == 0) { 
+            values[2] = atoi(token + 2); 
+        } 
+        else if (strncmp(token, "R=", 2) == 0) { 
+            values[3] = atoi(token + 2); 
+        } 
+        else if (strncmp(token, "T=", 2) == 0) { 
+            values[4] = atoi(token + 2); 
+        } 
+        else if (strncmp(token, "F=", 2) == 0) { 
+            values[5] = atoi(token + 2); 
+        } 
+        else if (strncmp(token, "L1=", 3) == 0) { 
+            extractAndPadString(token + 3, lcdLine1); 
+        } 
+        else if (strncmp(token, "L2=", 3) == 0) { 
+            extractAndPadString(token + 3, lcdLine2); 
+        }
 
-    // Read the 6 integers first
-    strtokIndx = strtok(tempChars, ","); 
-    for (int i = 0; i < 6; i++) {
-        if (strtokIndx == NULL) return false; // Packet cut off prematurely
-        tempValues[i] = atoi(strtokIndx); 
-        strtokIndx = strtok(NULL, ","); 
+        // Grab the next token
+        token = strtok(NULL, ";");
     }
 
-    // Read LCD Line 1
-    if (strtokIndx == NULL) return false;
-    extractAndPadString(strtokIndx, lcdLine1);
-    
-    // Read LCD Line 2 (stops at newline)
-    strtokIndx = strtok(NULL, "\n"); 
-    if (strtokIndx == NULL) return false;
-    extractAndPadString(strtokIndx, lcdLine2);
-
-    // If we reach here, the packet is 100% valid. Commit to main arrays.
-    for (int i = 0; i < 6; i++) {
-        values[i] = tempValues[i];
-    }
-    
-    return true;
+    return true; 
 }
 
 // ==========================================
@@ -200,7 +224,7 @@ bool parseCommaData() {
 // ==========================================
 void triggerFailsafe() {
     for (int i = 0; i < 6; i++) {
-        values[i] = 0; // Drop all needles and lights to 0
+        values[i] = 0; 
     }
     strcpy(lcdLine1, "  SIMHUB READY  ");
     strcpy(lcdLine2, " WAITING FOR PC ");
@@ -236,7 +260,7 @@ void setup() {
   Wire.begin();
   
   lcd.init();
-  Wire.setClock(400000); // FIXED: Overclock AFTER init so it isn't overwritten
+  Wire.setClock(400000); 
   lcd.backlight();
   lcd.setCursor(0,0);
   lcd.print("System Loading..");
@@ -250,10 +274,9 @@ void loop() {
   // 1. CONSTANTLY LISTEN TO SERIAL PORT
   recvWithEndMarker();
   if (newData == true) {
-    strcpy(tempChars, receivedChars); // Copy to temp buffer to protect original
+    strcpy(tempChars, receivedChars); 
     
-    // Only update timers and flags if parsing was successful
-    if (parseCommaData()) {
+    if (parseKeyValData()) {
         lastValidDataTime = millis();
         isHardwareStandby = false;
     }
@@ -272,7 +295,7 @@ void loop() {
     lastProcessTime = nowMicros; 
                 
     // ----------------------------------------------------
-    // SPEEDOMETER LOGIC (With Glitch & Laziness Protection)
+    // SPEEDOMETER LOGIC 
     // ----------------------------------------------------
     int rawSpeedHz = calcHz(values[2], speedSteps, speedHz, SPEED_POINTS);
     static int currentSpeedHz = 0;
@@ -299,12 +322,12 @@ void loop() {
     }
 
     // ----------------------------------------------------
-    // TACHOMETER LOGIC (Instant response)
+    // TACHOMETER LOGIC 
     // ----------------------------------------------------
     int targetTachHz = calcHz(values[3], rpmSteps, tachHz, TACH_POINTS);
 
     // ----------------------------------------------------
-    // ANALOG GAUGES LOGIC (Temp & Fuel)
+    // ANALOG GAUGES LOGIC 
     // ----------------------------------------------------
     int targetTempPWM = calcHz(values[4], tempSteps, tempPWMVal, TEMP_POINTS);
     int targetFuelPWM = calcHz(values[5], fuelSteps, fuelPWMVal, FUEL_POINTS);
@@ -313,7 +336,7 @@ void loop() {
     if (targetTempPWM > 0) { analogWrite(TEMP, targetTempPWM); } else { analogWrite(TEMP, 0); }
     
     // ----------------------------------------------------
-    // PUSH FREQUENCIES TO THE BACKGROUND INTERRUPT (ISR)
+    // PUSH FREQUENCIES TO ISR
     // ----------------------------------------------------
     noInterrupts(); 
 
@@ -337,7 +360,7 @@ void loop() {
     // ----------------------------------------------------
     // INDICATOR LIGHTS LOGIC
     // ----------------------------------------------------
-    if ( values[1] == 1) { digitalWrite(engineLight,HIGH); } // FIXED: Engine Light active state corrected
+    if ( values[1] == 1) { digitalWrite(engineLight,HIGH); } 
     else { digitalWrite(engineLight,LOW); }
 
     int targetShiftPWM = 0;
