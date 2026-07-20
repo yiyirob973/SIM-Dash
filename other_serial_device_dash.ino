@@ -2,25 +2,16 @@
  *  SIM RACING GAUGE CLUSTER CONTROLLER (Arduino Nano)
  *  
  *  MODULAR KEY-VALUE (TOKEN) FORMAT:
- *  Instead of strict comma-separated lists, the code now looks for specific identifiers.
- *  You can send these in any order. If one is missing, the code just ignores it and 
- *  keeps the previous value.
+ *  The code scans for explicit string identifiers separated by semicolons (;).
+ *  Items can arrive in any order or be omitted entirely. Unsent tokens retain their
+ *  last valid state or fall back cleanly without crashing the loop.
  *
  *  Tokens: 
  *  S= (ShiftLight), E= (EngineLight), V= (Velocity/Speed), R= (RPM), 
- *  T= (Temp), F= (Fuel), L1= (LCD Line 1), L2= (LCD Line 2)
+ *  T= (Temp), F= (Fuel), B= (Boost), L1= (LCD Line 1), L2= (LCD Line 2)
  *
- *  --- EXPECTED SIMHUB JAVASCRIPT OUTPUT FORMAT ---
- *  Delimiter between items is a semicolon (;). End of message is a newline (\n).
- *  Example String: "S=1;E=0;V=120;R=5500;T=90;F=45;L1=GEAR: 4;L2=LAP: 1:24.33;\n"
- *
- *  SimHub Custom Serial Javascript Example:
- *  var output = "";
- *  if (shift != null) output += "S=" + shift + ";";
- *  if (speed != null) output += "V=" + speed + ";";
- *  output += "R=" + rpm + ";"; 
- *  output += "L1=" + lcdLine1 + ";";
- *  return output + "\n";
+ *  Expected Stream Example: 
+ *  "S=1;V=60;R=4500;B=12;L1=BOOST ACTIVE;L2=CRUISING;\n"
  * ==================================================================================== */
 
 #include <LiquidCrystal_I2C.h> 
@@ -30,18 +21,19 @@
 // ==========================================
 // --- HARDWARE PIN CONFIGURATION ---
 // ==========================================
-#define shiftLight 3  
-#define engineLight 4 
-#define TACH 2        
-#define TEMP 5        
-#define SP 11         
-#define FUEL 6        
-#define FIVEV 12      
+#define shiftLight 3  // Native PWM
+#define engineLight 4 // Digital Out
+#define TACH 2        // Timer1 Interrupt (DDS)
+#define TEMP 5        // Native PWM
+#define SP 11         // Timer1 Interrupt (DDS)
+#define FUEL 6        // Native PWM
+#define BOOST 9       // Native PWM (NEW: Core Boost Gauge Pin)
+#define FIVEV 12      // Auxiliary 5V Rail
 
 // ==========================================
 // --- SERIAL PARSING VARIABLES ---
 // ==========================================
-const byte maxChars = 120; // Increased buffer size to account for key-value characters      
+const byte maxChars = 140; // Expanded to handle extra boost tokens safely      
 char receivedChars[maxChars];    
 char tempChars[maxChars];        
 boolean newData = false;         
@@ -63,8 +55,8 @@ const unsigned long intervalMicros = 8333; // 120Hz refresh rate
 
 int currentShiftPWM = 0; 
 
-// Array to hold the parsed telemetry data: [Shift, EngLight, Speed, RPM, Temp, Fuel]
-int values[6] = {0, 0, 0, 0, 0, 0}; 
+// Array to hold parsed telemetry data: [Shift, EngLight, Speed, RPM, Temp, Fuel, Boost]
+int values[7] = {0, 0, 0, 0, 0, 0, 0}; 
 
 // LCD screen buffers
 char lcdLine1[17] = "                "; 
@@ -89,7 +81,6 @@ void toneISR() {
     if (tachTickCounter >= tachPeriodTicks) {
       tachTickCounter = 0;
       tachState = !tachState; 
-      
       if (tachState) { PORTD |= B00000100; }  
       else           { PORTD &= ~B00000100; } 
     }
@@ -100,7 +91,6 @@ void toneISR() {
     if (speedoTickCounter >= speedoPeriodTicks) {
       speedoTickCounter = 0;
       speedoState = !speedoState; 
-      
       if (speedoState) { PORTB |= B00001000; }  
       else             { PORTB &= ~B00001000; } 
     }
@@ -117,6 +107,11 @@ const int tempPWMVal[] = {0, 170, 220};
 const int FUEL_POINTS = 4;
 const int fuelSteps[] = {0, 15, 50, 100};   
 const int fuelPWMVal[] = {0, 130, 161, 255};
+
+// NEW: Boost Gauge Calibration (Example setup for 0 to 30 PSI/Bar equivalent metrics)
+const int BOOST_POINTS = 3;
+const int boostSteps[] = {0, 15, 30};    
+const int boostPWMVal[] = {0, 127, 255};  
 
 const int TACH_POINTS = 14;
 const int rpmSteps[] = {0,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000,13000}; 
@@ -181,12 +176,9 @@ void extractAndPadString(char* source, char* destination) {
 // ==========================================
 bool parseKeyValData() {
     char * token;
-    
-    // Split the string by the semicolon delimiter
     token = strtok(tempChars, ";");
     
     while (token != NULL) {
-        // Check the prefix of each token and update the corresponding variable
         if (strncmp(token, "S=", 2) == 0) { 
             values[0] = atoi(token + 2); 
         } 
@@ -205,25 +197,22 @@ bool parseKeyValData() {
         else if (strncmp(token, "F=", 2) == 0) { 
             values[5] = atoi(token + 2); 
         } 
+        else if (strncmp(token, "B=", 2) == 0) { // NEW: Parse boost payload
+            values[6] = atoi(token + 2); 
+        }
         else if (strncmp(token, "L1=", 3) == 0) { 
             extractAndPadString(token + 3, lcdLine1); 
         } 
         else if (strncmp(token, "L2=", 3) == 0) { 
             extractAndPadString(token + 3, lcdLine2); 
         }
-
-        // Grab the next token
         token = strtok(NULL, ";");
     }
-
     return true; 
 }
 
-// ==========================================
-// --- FAILSAFE TRIGGER ---
-// ==========================================
 void triggerFailsafe() {
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) { // Clear all 7 indices cleanly
         values[i] = 0; 
     }
     strcpy(lcdLine1, "  SIMHUB READY  ");
@@ -251,14 +240,15 @@ void setup() {
   
   pinMode(TEMP, OUTPUT);
   pinMode(FUEL, OUTPUT);
+  pinMode(BOOST, OUTPUT); // NEW: Define Boost output behavior
   digitalWrite(TEMP, LOW);
   digitalWrite(FUEL, LOW);
+  digitalWrite(BOOST, LOW);
     
   Timer1.initialize(50);
   Timer1.attachInterrupt(toneISR); 
 
   Wire.begin();
-  
   lcd.init();
   Wire.setClock(400000); 
   lcd.backlight();
@@ -270,12 +260,9 @@ void setup() {
 // --- MAIN PROCESSING LOOP ---
 // ==========================================
 void loop() {
-  
-  // 1. CONSTANTLY LISTEN TO SERIAL PORT
   recvWithEndMarker();
   if (newData == true) {
     strcpy(tempChars, receivedChars); 
-    
     if (parseKeyValData()) {
         lastValidDataTime = millis();
         isHardwareStandby = false;
@@ -283,93 +270,62 @@ void loop() {
     newData = false;
   }
 
-  // 2. TIMEOUT FAILSAFE CHECK
   if (!isHardwareStandby && (millis() - lastValidDataTime > timeoutMillis)) {
       triggerFailsafe();
       isHardwareStandby = true;
   }
 
-  // 3. HARDWARE UPDATE TICK
   unsigned long nowMicros = micros();
   if (nowMicros - lastProcessTime >= intervalMicros) {
     lastProcessTime = nowMicros; 
                 
-    // ----------------------------------------------------
-    // SPEEDOMETER LOGIC 
-    // ----------------------------------------------------
+    // Speedometer Logic
     int rawSpeedHz = calcHz(values[2], speedSteps, speedHz, SPEED_POINTS);
     static int currentSpeedHz = 0;
     static int zeroFrameCounter = 0;
     
     if (rawSpeedHz == 0 && currentSpeedHz > 15) {
       zeroFrameCounter++;
-      if (zeroFrameCounter < 12) { 
-        rawSpeedHz = currentSpeedHz; 
-      }
-    } else {
-      zeroFrameCounter = 0; 
-    }
+      if (zeroFrameCounter < 12) { rawSpeedHz = currentSpeedHz; }
+    } else { zeroFrameCounter = 0; }
 
     const int SPEED_ACCEL_RATE = 5; 
     const int SPEED_DECEL_RATE = 3; 
 
-    if (rawSpeedHz > currentSpeedHz + SPEED_ACCEL_RATE) {
-      currentSpeedHz += SPEED_ACCEL_RATE; 
-    } else if (rawSpeedHz < currentSpeedHz - SPEED_DECEL_RATE) {
-      currentSpeedHz -= SPEED_DECEL_RATE; 
-    } else {
-      currentSpeedHz = rawSpeedHz; 
-    }
+    if (rawSpeedHz > currentSpeedHz + SPEED_ACCEL_RATE) { currentSpeedHz += SPEED_ACCEL_RATE; } 
+    else if (rawSpeedHz < currentSpeedHz - SPEED_DECEL_RATE) { currentSpeedHz -= SPEED_DECEL_RATE; } 
+    else { currentSpeedHz = rawSpeedHz; }
 
-    // ----------------------------------------------------
-    // TACHOMETER LOGIC 
-    // ----------------------------------------------------
+    // Tachometer Logic 
     int targetTachHz = calcHz(values[3], rpmSteps, tachHz, TACH_POINTS);
 
-    // ----------------------------------------------------
-    // ANALOG GAUGES LOGIC 
-    // ----------------------------------------------------
+    // Analog Gauges Logic (Temp, Fuel, and Boost)
     int targetTempPWM = calcHz(values[4], tempSteps, tempPWMVal, TEMP_POINTS);
     int targetFuelPWM = calcHz(values[5], fuelSteps, fuelPWMVal, FUEL_POINTS);
+    int targetBoostPWM = calcHz(values[6], boostSteps, boostPWMVal, BOOST_POINTS); // NEW: Calibrate Boost
 
     if (targetFuelPWM > 0) { analogWrite(FUEL, targetFuelPWM); } else { analogWrite(FUEL, 0); }
     if (targetTempPWM > 0) { analogWrite(TEMP, targetTempPWM); } else { analogWrite(TEMP, 0); }
+    if (targetBoostPWM > 0) { analogWrite(BOOST, targetBoostPWM); } else { analogWrite(BOOST, 0); } // NEW: Direct Write
     
-    // ----------------------------------------------------
-    // PUSH FREQUENCIES TO ISR
-    // ----------------------------------------------------
+    // Frequency Delivery to Interrupt
     noInterrupts(); 
-
-    if (targetTachHz > 15) {
-      tachPeriodTicks = 10000 / targetTachHz; 
-    } else {
-      tachPeriodTicks = 0; 
-      tachState = false;
-      digitalWrite(TACH, LOW);
-    }
+    if (targetTachHz > 15) { tachPeriodTicks = 10000 / targetTachHz; } 
+    else { tachPeriodTicks = 0; tachState = false; digitalWrite(TACH, LOW); }
     
-    if (currentSpeedHz > 15) {
-      speedoPeriodTicks = 10000 / currentSpeedHz;
-    } else {
-      speedoPeriodTicks = 0; 
-      speedoState = false;
-      digitalWrite(SP, LOW);
-    }
+    if (currentSpeedHz > 15) { speedoPeriodTicks = 10000 / currentSpeedHz; } 
+    else { speedoPeriodTicks = 0; speedoState = false; digitalWrite(SP, LOW); }
     interrupts(); 
 
-    // ----------------------------------------------------
-    // INDICATOR LIGHTS LOGIC
-    // ----------------------------------------------------
-    if ( values[1] == 1) { digitalWrite(engineLight,HIGH); } 
-    else { digitalWrite(engineLight,LOW); }
+    // Indicator Lights Logic
+    if (values[1] == 1) { digitalWrite(engineLight, HIGH); } 
+    else { digitalWrite(engineLight, LOW); }
 
     int targetShiftPWM = 0;
-    if ( values[0] == 1) { targetShiftPWM = 20; }       
+    if (values[0] == 1) { targetShiftPWM = 20; }       
     else if (values[0] == 2) { targetShiftPWM = 255; }  
-    else { targetShiftPWM = 0; }                        
 
     const int SHIFT_FADE_SPEED = 2; 
-
     if (currentShiftPWM < targetShiftPWM) {
         currentShiftPWM += SHIFT_FADE_SPEED;
         if (currentShiftPWM > targetShiftPWM) currentShiftPWM = targetShiftPWM; 
@@ -377,22 +333,14 @@ void loop() {
         currentShiftPWM -= (SHIFT_FADE_SPEED * 3); 
         if (currentShiftPWM < targetShiftPWM) currentShiftPWM = targetShiftPWM; 
     }
-    
     analogWrite(shiftLight, currentShiftPWM);
 
-    // ----------------------------------------------------
-    // LCD SCREEN UPDATES
-    // ----------------------------------------------------
+    // LCD Screen Updates
     if (strcmp(lcdLine1, lastLine1) != 0) {
-      lcd.setCursor(0, 0); 
-      lcd.print(lcdLine1); 
-      strcpy(lastLine1, lcdLine1); 
+      lcd.setCursor(0, 0); lcd.print(lcdLine1); strcpy(lastLine1, lcdLine1); 
     }
-
     if (strcmp(lcdLine2, lastLine2) != 0) {
-      lcd.setCursor(0, 1); 
-      lcd.print(lcdLine2); 
-      strcpy(lastLine2, lcdLine2); 
+      lcd.setCursor(0, 1); lcd.print(lcdLine2); strcpy(lastLine2, lcdLine2); 
     } 
   }
 }
